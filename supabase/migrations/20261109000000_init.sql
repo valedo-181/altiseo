@@ -4,8 +4,10 @@
 -- publication, audit) écrivent avec la clé service_role, côté serveur uniquement.
 -- Heures en timestamptz (UTC), montants en centimes entiers + devise.
 
-create extension if not exists pgcrypto;
-create extension if not exists citext;
+-- Comme Supabase : extensions dans le schéma « extensions », pas dans public.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+create extension if not exists citext with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Espaces et membres
@@ -177,7 +179,7 @@ create table public.keywords (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces (id) on delete cascade,
   site_id uuid not null references public.sites (id) on delete cascade,
-  phrase citext not null check (length(phrase) between 2 and 200),
+  phrase extensions.citext not null check (length(phrase) between 2 and 200),
   language text not null,
   search_volume int check (search_volume >= 0),
   difficulty smallint check (difficulty between 0 and 100),

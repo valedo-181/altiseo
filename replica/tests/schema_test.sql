@@ -9,13 +9,13 @@ insert into auth.users (id) values
 set role authenticated;
 
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
-select public.create_workspace('Atelier Alice') as wa \gset
+select public.ensure_workspace('Atelier Alice') as wa \gset
 insert into public.sites (workspace_id, url) values (:'wa', 'https://alice.example') returning id as sa \gset
 insert into public.calendar_items (workspace_id, site_id, scheduled_for, title)
   values (:'wa', :'sa', '2026-12-01', 'Premier sujet');
 
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
-select public.create_workspace('Boutique Bruno') as wb \gset
+select public.ensure_workspace('Boutique Bruno') as wb \gset
 insert into public.sites (workspace_id, url) values (:'wb', 'https://bruno.example') returning id as sb \gset
 
 select set_config('t.wa', :'wa', false), set_config('t.sa', :'sa', false),
@@ -86,6 +86,7 @@ end $$;
 
 -- 7. Quota : 30 articles sur Grow, le 31e est refusé ; sans abonnement, aucun
 reset role;
+update public.subscriptions set status = 'canceled' where workspace_id = :'wa';
 do $$ declare w uuid := current_setting('t.wa')::uuid; s uuid := current_setting('t.sa')::uuid; begin
   begin
     insert into public.articles (workspace_id, site_id, title, slug, language, counted_in_period)
@@ -94,11 +95,11 @@ do $$ declare w uuid := current_setting('t.wa')::uuid; s uuid := current_setting
   exception when sqlstate 'Q0002' then null;
   end;
 end $$;
-insert into public.subscriptions (workspace_id, plan_code, status) values (:'wa', 'grow', 'trialing');
+update public.subscriptions set status = 'trialing' where workspace_id = :'wa';
 insert into public.articles (workspace_id, site_id, title, slug, language, counted_in_period)
   select :'wa', :'sa', 'Article ' || g, 'article-' || g, 'fr', current_date from generate_series(1, 30) g;
 do $$ declare w uuid := current_setting('t.wa')::uuid; s uuid := current_setting('t.sa')::uuid; begin
-  if public.articles_left(w) <> 0 then raise exception 'ÉCHEC 7 : reste %', public.articles_left(w); end if;
+  if public._articles_left(w) <> 0 then raise exception 'ÉCHEC 7 : reste %', public._articles_left(w); end if;
   begin
     insert into public.articles (workspace_id, site_id, title, slug, language, counted_in_period)
       values (w, s, 'Trop', 'article-31', 'fr', current_date);
@@ -145,4 +146,13 @@ do $$ begin
   end;
 end $$;
 reset role;
-select 'schema_test : 9 vérifications OK' as resultat;
+
+-- 10. Un compte ne lit pas le quota d'un autre espace
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin
+  if public.articles_left(current_setting('t.wa')::uuid) is not null then raise exception 'ÉCHEC 10 : Bruno lit le quota d''Alice'; end if;
+  if public.articles_left(current_setting('t.wb')::uuid) is null then raise exception 'ÉCHEC 10 : Bruno ne lit pas son propre espace'; end if;
+end $$;
+reset role;
+select 'schema_test : 10 vérifications OK' as resultat;

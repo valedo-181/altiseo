@@ -215,7 +215,8 @@ create table public.articles (
   slug text not null check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   meta_title text check (length(meta_title) <= 70),
   meta_description text check (length(meta_description) <= 170),
-  body_html text not null default '',
+  body_md text not null default '',               -- Markdown restreint (src/lib/domain/markdown.ts), modifiable
+  body_html text not null default '',             -- produit depuis body_md à la publication
   language text not null,
   keywords text[] not null default '{}',
   featured_image_path text,                      -- Supabase Storage

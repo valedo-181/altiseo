@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "description": "Altiseo : des articles SEO écrits, planifiés et publiés pour vous.",
-  "engines": { "node": ">=20.11" },
+  "engines": {
+    "node": ">=20.11"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "tokens": "python3 -I replica/design/build_tokens.py && python3 -I .claude/skills/replica-design/contrast.py replica/design/tokens.json",
-    "test:db": "bash replica/tests/run.sh"
+    "test:db": "bash replica/tests/run.sh",
+    "test": "node --experimental-strip-types --no-warnings --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.5",
@@ -18,7 +21,8 @@
     "lucide-react": "^0.468.0",
     "next": "^15.3.3",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

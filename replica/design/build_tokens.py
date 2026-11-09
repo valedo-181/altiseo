@@ -91,8 +91,8 @@ export default {
       transitionDuration: { fast: "120ms", base: "200ms", slow: "320ms" },
       transitionTimingFunction: { brand: "%s" },
       maxWidth: { content: "var(--layout-content-max)", reading: "var(--layout-reading-max)" },
-      width: { sidebar: "var(--layout-sidebar)" },
-      height: { topbar: "var(--layout-topbar)" },
+      // Noms (pas de chiffres) : ne masquent pas l'échelle p-4, h-10… de Tailwind.
+      spacing: { sidebar: "var(--layout-sidebar)", topbar: "var(--layout-topbar)" },
     },
   },
 } satisfies Partial<Config>;

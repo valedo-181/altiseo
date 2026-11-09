@@ -5,7 +5,12 @@ mois de sujets avec leurs mots-clés, écrit un article par jour et le publie su
 (WordPress, Webflow, Shopify, webhook), en brouillon à relire ou directement. Plus un audit SEO
 technique du site.
 
-État : **système de design** en place (`/design`). L'application elle-même vient ensuite.
+État : **première version en mode démo**. Le parcours complet marche : inscription → site → 7 étapes
+de configuration → calendrier de 30 sujets → écrire un article → le corriger → l'envoyer à WordPress.
+En mode démo, les données sont dans `.data/demo.json`, les articles sont des **textes d'exemple
+(sans IA)** et **rien n'est envoyé** à WordPress. La vraie base (Supabase), l'IA (Claude),
+les mots-clés (DataForSEO) et le paiement (Stripe) arrivent avec l'étape backend.
+Détail écran par écran : `replica/build-log.md`.
 
 ## Plans
 
@@ -23,6 +28,7 @@ technique du site.
 npm install
 npm run dev          # http://localhost:3000, système de design sur /design
 npm run typecheck
+npm test             # logique métier (URL, dates, calendrier, Markdown sûr, article)
 npm run tokens       # après une modification de replica/design/tokens.json
 npm run test:db      # schéma + RLS sur un Postgres 16 local (initdb, pg_ctl, psql ; pas en root)
 ```
@@ -33,3 +39,14 @@ Next.js 15 (App Router) + TypeScript + Tailwind CSS 3. Couleurs, tailles et rayo
 les jetons : `replica/design/tokens.json` → `src/styles/tokens.css` + `tailwind.preset.ts`
 (`npm run tokens`), mode clair et sombre. Polices Inter et Source Serif 4 (licence OFL), icônes
 Lucide (ISC).
+
+## Vérifier le parcours complet
+
+```bash
+npm run build
+ALTISEO_DEMO=1 ALTISEO_DEMO_FILE=/tmp/altiseo-demo.json npx next start -p 3100 &
+node scripts/slice-check.cjs       # 35 contrôles dans un vrai navigateur (Playwright)
+```
+
+`ALTISEO_DEMO=1` autorise le mode démo en production locale ; en vrai déploiement il faut
+`ALTISEO_SESSION_SECRET` (32 caractères au moins).

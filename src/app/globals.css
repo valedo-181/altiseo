@@ -42,3 +42,17 @@
   .pill { @apply inline-flex items-center gap-1 h-6 px-2 rounded-pill text-xs font-medium whitespace-nowrap; }
   .card { @apply rounded-lg border border-border bg-bg p-4 shadow-card; }
 }
+
+/* Aperçu d'un article (police de lecture). */
+@layer components {
+  .prose-article { @apply text-base leading-7 text-text; }
+  .prose-article h2 { @apply mt-8 font-sans text-xl; }
+  .prose-article h3 { @apply mt-6 font-sans text-lg; }
+  .prose-article p, .prose-article ul, .prose-article ol, .prose-article blockquote { @apply mt-4; }
+  .prose-article ul { @apply list-disc pl-6; }
+  .prose-article ol { @apply list-decimal pl-6; }
+  .prose-article li { @apply mt-1; }
+  .prose-article a { @apply text-accent underline underline-offset-2; }
+  .prose-article blockquote { @apply border-l-4 border-border pl-4 text-text-muted; }
+  .prose-article > :first-child { @apply mt-0; }
+}

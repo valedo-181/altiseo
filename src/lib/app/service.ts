@@ -1,7 +1,12 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { AiError, analyzeSite, planTopics, writeArticle, type SiteBrief } from "@/lib/ai/claude";
+import { testWordPress, upsertWordPressPost } from "@/lib/cms/wordpress";
+import { config } from "@/lib/config";
 import { db } from "@/lib/data/store";
-import { addDays, localDate } from "@/lib/domain/dates";
+import { safeFetch } from "@/lib/seo/crawl";
+import { htmlToText } from "@/lib/seo/text";
+import { addDays, localDate, publishDates } from "@/lib/domain/dates";
 import { markdownToHtml, wordCount } from "@/lib/domain/markdown";
 import { alternativeDemoTopic, planDemoTopics } from "@/lib/domain/plan";
 import { slugify, uniqueSlug } from "@/lib/domain/slug";
@@ -10,9 +15,21 @@ import { guessLanguage, normalizeSiteUrl, siteNameFromHost } from "@/lib/domain/
 import { writeDemoArticle } from "@/lib/domain/write";
 
 /**
- * Opérations métier. Aujourd'hui en MODE DÉMO (pas d'IA, pas d'envoi réel) ; les mêmes fonctions
- * appelleront Claude, DataForSEO et les CMS avec /replica-backend, sans changer les écrans.
+ * Opérations métier. Chaque service réel prend le relais dès que ses clés sont là (src/lib/config.ts) :
+ * Claude pour l'analyse, les sujets et les articles ; WordPress pour l'envoi. Sinon : mode démo.
+ * Volume et difficulté des mots-clés : DataForSEO, à brancher.
  */
+
+async function brief(workspaceId: string, site: Site): Promise<SiteBrief> {
+  const competitors = (await db.listCompetitors(workspaceId, site.id)).map((c) => c.url);
+  return {
+    name: site.name, url: site.url, theme: site.theme, language: site.language, businessDescription: site.businessDescription,
+    targetAudience: site.targetAudience, tone: site.tone, customInstructions: site.customInstructions,
+    mentionCompetitors: site.mentionCompetitors, competitors, targetWords: site.targetWords,
+  };
+}
+
+const aiMessage = (e: unknown) => (e instanceof AiError ? e.message : "La rédaction a échoué. Réessayez dans un moment.");
 
 export type Result<T = void> = { ok: true; value: T } | { ok: false; error: string };
 const fail = (error: string): Result<never> => ({ ok: false, error });
@@ -23,14 +40,28 @@ export async function createSiteFromUrl(workspaceId: string, raw: string): Promi
   if (!u.ok) return fail(u.error);
   const existing = (await db.listSites(workspaceId)).find((s) => s.url === u.url);
   if (existing) return { ok: true, value: existing };
+  // Analyse réelle : page d'accueil lue (adresses publiques seulement) puis décrite par Claude.
+  // En cas d'échec, on garde les valeurs devinées depuis le domaine : le client les corrige à l'étape suivante.
+  let found: { name: string; theme: string; businessDescription: string; targetAudience: string; tone: string; language: Site["language"] } | null = null;
+  if (config.ai) {
+    const page = await safeFetch(u.url);
+    if (page.status >= 200 && page.status < 300 && "body" in page && page.body) {
+      const t = htmlToText(page.body);
+      try {
+        found = (await analyzeSite({ url: u.url, ...t })).analysis;
+      } catch {
+        found = null;
+      }
+    }
+  }
   const site = await db.createSite(workspaceId, {
     url: u.url,
-    name: siteNameFromHost(u.host),
-    language: guessLanguage(u.host),
-    theme: "",
-    businessDescription: "",
-    targetAudience: "",
-    tone: "Clair et professionnel, vouvoiement",
+    name: found?.name || siteNameFromHost(u.host),
+    language: found?.language ?? guessLanguage(u.host),
+    theme: found?.theme ?? "",
+    businessDescription: found?.businessDescription ?? "",
+    targetAudience: found?.targetAudience ?? "",
+    tone: found?.tone || "Clair et professionnel, vouvoiement",
     customInstructions: "",
     mentionCompetitors: false,
     publishTime: "08:00",
@@ -39,7 +70,7 @@ export async function createSiteFromUrl(workspaceId: string, raw: string): Promi
     publishMode: "draft",
     targetWords: 1500,
     onboardingStep: 2,
-    analyzedAt: new Date().toISOString(),
+    analyzedAt: found ? new Date().toISOString() : null,
   });
   return { ok: true, value: site };
 }
@@ -51,9 +82,20 @@ export async function buildCalendar(workspaceId: string, siteId: string): Promis
   const from = addDays(localDate(new Date(), site.timezone), 1);
   const existing = await db.listCalendar(workspaceId, siteId);
   const kept = new Set(existing.filter((c) => c.status !== "proposed").map((c) => c.title));
-  const topics = planDemoTopics(site.theme, from, 30, site.publishDays, kept);
-  const n = await db.replaceProposed(workspaceId, siteId, topics);
-  return { ok: true, value: n };
+  const busy = new Set(existing.filter((c) => c.status !== "proposed").map((c) => c.scheduledFor));
+  if (!config.ai) {
+    const n = await db.replaceProposed(workspaceId, siteId, planDemoTopics(site.theme, from, 30, site.publishDays, kept));
+    return { ok: true, value: n };
+  }
+  const days = publishDates(from, 30 + busy.size, site.publishDays).filter((d) => !busy.has(d)).slice(0, 30);
+  const published = (await db.listArticles(workspaceId, siteId)).map((a) => a.title);
+  try {
+    const { topics } = await planTopics(await brief(workspaceId, site), days.length, [...kept, ...published]);
+    const n = await db.replaceProposed(workspaceId, siteId, topics.map((t, i) => ({ ...t, scheduledFor: days[i] })).filter((t) => t.scheduledFor));
+    return { ok: true, value: n };
+  } catch (e) {
+    return fail(aiMessage(e));
+  }
 }
 
 export async function regenerateTopic(workspaceId: string, itemId: string): Promise<Result> {
@@ -67,8 +109,17 @@ export async function regenerateTopic(workspaceId: string, itemId: string): Prom
     if (error) return fail(error);
     const site = await db.getSite(workspaceId, item.siteId);
     const taken = new Set((await db.listCalendar(workspaceId, item.siteId)).map((c) => c.title));
-    const alt = alternativeDemoTopic(site.theme, item.scheduledFor, taken, item.regenerations + item.title.length);
-    if (!alt) return fail("Plus d'autre sujet disponible en mode démo pour ce jour.");
+    let alt: { title: string; angle: string; keyword: string } | null;
+    if (config.ai) {
+      try {
+        alt = (await planTopics(await brief(workspaceId, site), 1, [...taken])).topics[0] ?? null;
+      } catch (e) {
+        return fail(aiMessage(e));
+      }
+    } else {
+      alt = alternativeDemoTopic(site.theme, item.scheduledFor, taken, item.regenerations + item.title.length);
+    }
+    if (!alt) return fail(config.ai ? "Aucun autre sujet n'a été proposé. Réessayez." : "Plus d'autre sujet disponible en mode démo pour ce jour.");
     await db.updateCalendarItem(workspaceId, itemId, (it) => {
       it.title = alt.title; it.angle = alt.angle; it.keyword = alt.keyword;
       it.status = "proposed"; it.regenerations += 1;
@@ -101,15 +152,31 @@ export async function writeArticleForTopic(workspaceId: string, itemId: string):
   const { site, item } = items;
   if (item.status === "done") return fail("Ce sujet a déjà son article.");
   if (item.status === "skipped") return fail("Ce jour est sauté : remettez le sujet avant de l'écrire.");
-  const existing = (await db.listArticles(workspaceId, site.id)).map((a) => ({ title: a.title, slug: a.slug }));
-  const w = writeDemoArticle({ siteName: site.name, siteUrl: site.url, theme: site.theme, title: item.title, angle: item.angle, keyword: item.keyword, existing });
+  const sub = await db.subscription(workspaceId);
+  if (sub && sub.used >= sub.articlesPerMonth) return fail("Quota d'articles atteint pour ce mois."); // avant de payer l'IA
+  const articles = await db.listArticles(workspaceId, site.id);
+  let w: ReturnType<typeof writeDemoArticle>;
+  let cost: { inputTokens: number; outputTokens: number; microUsd: number } | undefined;
+  if (config.ai) {
+    // Liens internes : articles déjà publiés (adresse WordPress « nom de l'article »).
+    const pages = articles.filter((a) => a.status === "published").map((a) => ({ title: a.title, url: `${site.url}/${a.slug}/` }));
+    try {
+      const r = await writeArticle({ site: await brief(workspaceId, site), title: item.title, angle: item.angle, keyword: item.keyword, pages });
+      w = r.article;
+      cost = r.usage;
+    } catch (e) {
+      return fail(aiMessage(e));
+    }
+  } else {
+    w = writeDemoArticle({ siteName: site.name, siteUrl: site.url, theme: site.theme, title: item.title, angle: item.angle, keyword: item.keyword, existing: articles.map((a) => ({ title: a.title, slug: a.slug })) });
+  }
   const slug = uniqueSlug(slugify(w.title), new Set(await db.slugsOf(workspaceId, site.id)));
   try {
     const a = await db.createArticle(workspaceId, {
       siteId: site.id, calendarItemId: item.id, title: w.title, slug, metaTitle: w.metaTitle, metaDescription: w.metaDescription,
       bodyMd: w.bodyMd, language: site.language, keywords: w.keywords, internalLinks: w.internalLinks, wordCount: w.wordCount,
-      status: "draft", demo: true, publishedAt: null, editedAt: null,
-    });
+      status: "draft", demo: !config.ai, publishedAt: null, editedAt: null,
+    }, cost);
     return { ok: true, value: a.id };
   } catch (e) {
     return fail((e as Error).message);
@@ -148,14 +215,24 @@ export function looksLikeAppPassword(p: string): boolean {
 }
 
 /**
- * F05 : connexion WordPress (API REST + mot de passe d'application).
- * En démo : on vérifie la forme des champs, rien n'est envoyé et le mot de passe n'est PAS gardé.
+ * F05 : connexion WordPress (API REST + mot de passe d'application). Avec la vraie base et
+ * ENCRYPTION_KEY : test réel puis mot de passe chiffré. En démo : contrôle de forme, rien n'est gardé.
  */
 export async function connectWordPress(workspaceId: string, siteId: string, f: { endpoint: string; username: string; appPassword: string }): Promise<Result> {
   const u = normalizeSiteUrl(f.endpoint);
   if (!u.ok) return fail(u.error);
   if (!f.username.trim()) return fail("Indiquez le nom d'utilisateur WordPress.");
   if (!looksLikeAppPassword(f.appPassword)) return fail("Ce n'est pas un mot de passe d'application WordPress (24 lettres et chiffres). Créez-le dans WordPress : Profil → Mots de passe d'application.");
+  if (config.cms) {
+    const creds = { endpoint: u.url, username: f.username.trim(), appPassword: f.appPassword };
+    const t = await testWordPress(creds);
+    if (!t.ok) return fail(t.error);
+    await db.saveIntegration(workspaceId, siteId, {
+      kind: "wordpress", status: "ok", config: { endpoint: u.url, username: creds.username },
+      lastError: null, lastTestedAt: new Date().toISOString(), demo: false,
+    }, creds.appPassword.replace(/\s+/g, ""));
+    return { ok: true, value: undefined };
+  }
   await db.saveIntegration(workspaceId, siteId, {
     kind: "wordpress", status: "ok", config: { endpoint: u.url, username: f.username.trim() },
     lastError: null, lastTestedAt: new Date().toISOString(), demo: true,
@@ -164,14 +241,34 @@ export async function connectWordPress(workspaceId: string, siteId: string, f: {
 }
 
 /** F04 : envoie l'article au CMS (création, puis mise à jour du même billet). En démo : simulé. */
-export async function publishArticle(workspaceId: string, articleId: string): Promise<Result<{ mode: "draft" | "publish"; url: string }>> {
+export async function publishArticle(workspaceId: string, articleId: string): Promise<Result<{ mode: "draft" | "publish"; url: string; simulated: boolean }>> {
   const a = await db.getArticle(workspaceId, articleId);
   if (!a) return fail("Article introuvable.");
   const site = await db.getSite(workspaceId, a.siteId);
   const integ = (await db.listIntegrations(workspaceId, site.id)).find((i) => i.status === "ok");
   if (!integ) return fail("Connectez d'abord votre site (Intégrations).");
-  const html = markdownToHtml(a.bodyMd); // ce qui partira vers le CMS
+  const html = markdownToHtml(a.bodyMd); // ce qui part vers le CMS
   const prev = await db.publicationOf(workspaceId, a.id);
+  if (!integ.demo && config.cms) {
+    const secret = await db.integrationSecret(workspaceId, integ.id);
+    if (!secret || !integ.config.endpoint || !integ.config.username) return fail("Reconnectez WordPress (identifiants manquants).");
+    const r = await upsertWordPressPost(
+      { endpoint: integ.config.endpoint, username: integ.config.username, appPassword: secret },
+      { title: a.title, html, slug: a.slug, excerpt: a.metaDescription, status: site.publishMode },
+      prev?.remoteId ?? null,
+    );
+    const at = new Date().toISOString();
+    if (!r.ok) {
+      await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: prev?.remoteId ?? null, remoteUrl: prev?.remoteUrl ?? null, status: "error", error: r.error, lastAttemptAt: at });
+      return fail(r.error);
+    }
+    await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: r.value.id, remoteUrl: r.value.url, status: "ok", error: null, lastAttemptAt: at });
+    await db.updateArticle(workspaceId, a.id, {
+      status: site.publishMode === "publish" ? "published" : "draft",
+      publishedAt: site.publishMode === "publish" ? (a.publishedAt ?? at) : a.publishedAt,
+    });
+    return { ok: true, value: { mode: site.publishMode, url: r.value.url, simulated: false } };
+  }
   const remoteId = prev?.remoteId ?? `demo-${createHash("sha256").update(a.id).digest("hex").slice(0, 6)}`;
   const base = integ.config.endpoint ?? site.url;
   const url = site.publishMode === "draft" ? `${base}/wp-admin/post.php?post=${remoteId}&action=edit` : `${base}/${a.slug}/`;
@@ -181,5 +278,5 @@ export async function publishArticle(workspaceId: string, articleId: string): Pr
     publishedAt: site.publishMode === "publish" ? (a.publishedAt ?? new Date().toISOString()) : a.publishedAt,
   });
   void html;
-  return { ok: true, value: { mode: site.publishMode, url } };
+  return { ok: true, value: { mode: site.publishMode, url, simulated: true } };
 }

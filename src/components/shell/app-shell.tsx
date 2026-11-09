@@ -13,6 +13,8 @@ type Props = {
   site: Site;
   sites: Site[];
   quota: { used: number; total: number; trialEndsAt: string | null } | null;
+  /** Ce qui est encore simulé (rien = tout est branché). */
+  simulated: { ai: boolean; cms: boolean; data: boolean };
   children: React.ReactNode;
 };
 
@@ -21,7 +23,7 @@ function daysLeft(iso: string | null): number | null {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400_000));
 }
 
-export function AppShell({ user, site, sites, quota, children }: Props) {
+export function AppShell({ user, site, sites, quota, simulated, children }: Props) {
   const trial = daysLeft(quota?.trialEndsAt ?? null);
   return (
     <div className="min-h-dvh bg-surface">
@@ -72,10 +74,19 @@ export function AppShell({ user, site, sites, quota, children }: Props) {
         </header>
 
         <main id="contenu" className="mx-auto max-w-content space-y-6 px-4 pb-24 pt-6 md:px-6 lg:pb-10">
-          <Banner tone="info">
-            <strong className="font-semibold">Mode démo :</strong> les articles sont des textes d'exemple (sans IA) et rien n'est envoyé à WordPress.
-            {trial != null && <> Essai : {trial} jour{trial > 1 ? "s" : ""} restant{trial > 1 ? "s" : ""}.</>}
-          </Banner>
+          {(simulated.ai || simulated.cms || simulated.data || trial != null) && (
+            <Banner tone="info">
+              {(simulated.ai || simulated.cms || simulated.data) && (
+                <>
+                  <strong className="font-semibold">Mode démo :</strong>
+                  {simulated.data && " données gardées sur ce serveur seulement."}
+                  {simulated.ai && " les articles sont des textes d'exemple (sans IA)."}
+                  {simulated.cms && " rien n'est envoyé à WordPress."}
+                </>
+              )}
+              {trial != null && <> Essai : {trial} jour{trial > 1 ? "s" : ""} restant{trial > 1 ? "s" : ""}.</>}
+            </Banner>
+          )}
           {children}
         </main>
       </div>

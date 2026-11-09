@@ -1,5 +1,5 @@
 /**
- * Types métier, alignés sur replica/schema.sql (noms en camelCase).
+ * Types métier, alignés sur supabase/migrations (noms en camelCase).
  * La couche de données (src/lib/data) les lit et les écrit ; les écrans ne connaissent qu'eux.
  */
 

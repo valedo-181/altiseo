@@ -1,7 +1,10 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { requireAccount, requireSite, ONBOARDING_STEPS, type OnboardingSlug } from "@/lib/app/context";
+import { config, siteOrigin } from "@/lib/config";
+import { userClient } from "@/lib/supabase/server";
 import * as svc from "@/lib/app/service";
 import { endSession, rememberSite, startSession } from "@/lib/app/session";
 import { db, Conflict } from "@/lib/data/store";
@@ -15,14 +18,29 @@ const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 // ---------------------------------------------------------------------------
-// Compte (S03) — mode démo : pas de mot de passe, pas d'e-mail de confirmation
+// Compte (S03). Avec Supabase : lien de connexion par e-mail (sans mot de passe à retenir).
+// En mode démo : l'e-mail suffit, sans confirmation.
 // ---------------------------------------------------------------------------
+
+/** Envoie le lien de connexion. Message identique que le compte existe ou non (pas d'énumération). */
+async function sendMagicLink(email: string, name: string | null, create: boolean): Promise<FormState> {
+  const h = await headers();
+  const origin = siteOrigin(h.get("origin") ?? undefined);
+  const { error } = await (await userClient()).auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: `${origin}/auth/callback`, shouldCreateUser: create, data: name ? { name } : undefined },
+  });
+  if (error && error.status === 429) return { error: "Trop de demandes. Réessayez dans quelques minutes." };
+  if (error && !/not allowed|signups not allowed|user not found/i.test(error.message)) return { error: "L'e-mail n'a pas pu être envoyé. Réessayez." };
+  return { ok: `Si l'adresse est correcte, un lien de connexion vient d'être envoyé à ${email}. Il est valable une heure.` };
+}
 
 export async function signUp(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
   const name = str(f, "name") || null;
   if (!EMAIL.test(email)) return { error: "Cette adresse e-mail n'est pas valide." };
   if (name && name.length > 80) return { error: "Le nom est trop long." };
+  if (config.supabase) return sendMagicLink(email, name, true);
   try {
     const { user } = await db.createAccount(email, name);
     await startSession(user.id);
@@ -36,6 +54,7 @@ export async function signUp(_: FormState, f: FormData): Promise<FormState> {
 export async function signIn(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
   if (!EMAIL.test(email)) return { error: "Cette adresse e-mail n'est pas valide." };
+  if (config.supabase) return sendMagicLink(email, null, false);
   const user = await db.findUserByEmail(email);
   if (!user) return { error: "Aucun compte avec cet e-mail. Créez-en un." };
   await startSession(user.id);
@@ -220,7 +239,8 @@ export async function publishArticle(_: FormState, f: FormData): Promise<FormSta
   revalidatePath("/app/articles");
   revalidatePath("/app");
   if (!r.ok) return { error: r.error };
-  return { ok: r.value.mode === "draft" ? "Envoyé en brouillon sur WordPress (simulation)." : "Publié sur WordPress (simulation)." };
+  const sim = r.value.simulated ? " (simulation)" : "";
+  return { ok: r.value.mode === "draft" ? `Envoyé en brouillon sur WordPress${sim}.` : `Publié sur WordPress${sim}.` };
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +251,7 @@ export async function connectWordPress(_: FormState, f: FormData): Promise<FormS
   const { workspace, site } = await requireSite();
   const r = await svc.connectWordPress(workspace.id, site.id, { endpoint: str(f, "endpoint"), username: str(f, "username"), appPassword: str(f, "appPassword") });
   revalidatePath("/app/integrations");
-  return r.ok ? { ok: "WordPress est connecté (simulation : rien n'est envoyé)." } : { error: r.error };
+  return r.ok ? { ok: config.cms ? "WordPress est connecté : la connexion a été testée." : "WordPress est connecté (simulation : rien n'est envoyé)." } : { error: r.error };
 }
 
 export async function disconnectIntegration(f: FormData) {

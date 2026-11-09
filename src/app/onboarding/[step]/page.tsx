@@ -8,6 +8,9 @@ import { currentSiteId } from "@/lib/app/session";
 import { db } from "@/lib/data/store";
 import { ActivityStep, CompetitorsStep, LanguageStep, OfferStep, PublishingStep, ScheduleStep, SiteStep } from "./forms";
 
+/** Rédaction et analyse par l'IA : jusqu'à quelques minutes (Vercel Pro). */
+export const maxDuration = 300;
+
 export const metadata: Metadata = { title: "Configuration" };
 
 const TITLES: Record<OnboardingSlug, [string, string]> = {

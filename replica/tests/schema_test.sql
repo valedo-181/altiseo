@@ -1,4 +1,4 @@
--- Tests du schéma replica/schema.sql (Postgres local qui imite Supabase).
+-- Tests du schéma supabase/migrations (Postgres local qui imite Supabase).
 -- Chaque vérification lève une exception si elle échoue.
 \set ON_ERROR_STOP on
 
@@ -118,4 +118,31 @@ do $$ begin
 end $$;
 
 reset role;
-select 'schema_test : 8 vérifications OK' as resultat;
+
+-- 9. Premier accès : ensure_workspace crée un seul espace avec un essai, même appelée deux fois
+insert into auth.users (id) values ('00000000-0000-0000-0000-00000000000c');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+select public.ensure_workspace('Chloé') as wc1 \gset
+select public.ensure_workspace('Chloé') as wc2 \gset
+do $$ begin
+  if (select count(*) from public.memberships) <> 1 then raise exception 'ÉCHEC 9 : % espaces', (select count(*) from public.memberships); end if;
+  if (select status from public.subscriptions) <> 'trialing' then raise exception 'ÉCHEC 9 : pas d''essai'; end if;
+  if public.articles_left((select workspace_id from public.memberships)) <> 30 then raise exception 'ÉCHEC 9 : quota de départ'; end if;
+end $$;
+select (:'wc1' = :'wc2') as same_ws \gset
+\if :same_ws
+\else
+  do $$ begin raise exception 'ÉCHEC 9 : deux espaces différents'; end $$;
+\endif
+reset role;
+set role anon;
+do $$ begin
+  begin
+    perform public.ensure_workspace('x');
+    raise exception 'ÉCHEC 9 : anon peut appeler ensure_workspace';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+select 'schema_test : 9 vérifications OK' as resultat;

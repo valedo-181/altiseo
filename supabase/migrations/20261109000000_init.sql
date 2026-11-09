@@ -1,4 +1,4 @@
--- Schéma du produit « blog SEO automatique » (clone fonctionnel, périmètre de replica/recon.md).
+-- Altiseo : schéma initial (périmètre de replica/recon.md, plan de replica/architecture.md).
 -- Postgres 16 sur Supabase. Toutes les tables métier portent workspace_id et sont protégées par RLS :
 -- un membre d'un espace ne voit que cet espace, même par l'API. Les tâches de fond (rédaction,
 -- publication, audit) écrivent avec la clé service_role, côté serveur uniquement.
@@ -87,6 +87,7 @@ create table public.sites (
   workspace_id uuid not null references public.workspaces (id) on delete cascade,
   url text not null check (url ~ '^https?://'),
   name text,
+  theme text not null default '' check (length(theme) <= 60),   -- sujet principal, ex. « déménagement »
   language text not null default 'fr' check (language ~ '^[a-z]{2}(-[A-Z]{2})?$'),
   business_description text check (length(business_description) <= 4000),
   target_audience text check (length(target_audience) <= 2000),
@@ -137,6 +138,7 @@ create table public.integrations (
   status text not null default 'pending' check (status in ('pending', 'ok', 'error', 'disabled')),
   last_error text,
   last_tested_at timestamptz,
+  demo boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -147,7 +149,7 @@ create unique index integrations_one_active on public.integrations (site_id) whe
 
 -- Le navigateur ne lit jamais les identifiants : vue sans la colonne chiffrée.
 create view public.integrations_public with (security_invoker = true) as
-  select id, workspace_id, site_id, kind, config, status, last_error, last_tested_at, created_at, updated_at
+  select id, workspace_id, site_id, kind, config, status, last_error, last_tested_at, demo, created_at, updated_at
     from public.integrations;
 
 -- ---------------------------------------------------------------------------
@@ -195,6 +197,9 @@ create table public.calendar_items (
   title text not null check (length(title) between 3 and 200),
   angle text check (length(angle) <= 1000),
   seed_keyword_id uuid references public.keywords (id) on delete set null,
+  keyword text not null default '',
+  search_volume int check (search_volume >= 0),
+  difficulty smallint check (difficulty between 0 and 100),
   status text not null default 'proposed'
     check (status in ('proposed', 'approved', 'generating', 'done', 'failed', 'skipped')),
   regenerations smallint not null default 0 check (regenerations between 0 and 5),
@@ -224,6 +229,7 @@ create table public.articles (
   internal_links jsonb not null default '[]'
     check (jsonb_typeof(internal_links) = 'array' and jsonb_array_length(internal_links) <= 10),
   word_count int not null default 0,
+  demo boolean not null default false,           -- texte d'exemple (sans IA)
   status text not null default 'draft'
     check (status in ('draft', 'scheduled', 'published', 'failed', 'archived')),
   -- Coût IA (suivi des marges) : jetons et coût estimé en micro-dollars
@@ -425,6 +431,32 @@ begin
 end;
 $$;
 
+-- Premier accès après connexion : crée l'espace du compte s'il n'en a pas, avec un essai de 3 jours
+-- (30 articles). Appelée par /auth/callback ; ne fait rien si l'espace existe déjà.
+create or replace function public.ensure_workspace(ws_name text default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare wid uuid;
+begin
+  if auth.uid() is null then raise exception 'Connexion requise' using errcode = '42501'; end if;
+  select workspace_id into wid from public.memberships where user_id = auth.uid() order by created_at limit 1;
+  if wid is not null then return wid; end if;
+  perform pg_advisory_xact_lock(hashtext(auth.uid()::text));   -- deux onglets à la fois : un seul espace
+  select workspace_id into wid from public.memberships where user_id = auth.uid() order by created_at limit 1;
+  if wid is not null then return wid; end if;
+  insert into public.workspaces (name) values (coalesce(nullif(trim(ws_name), ''), 'Mon espace')) returning id into wid;
+  insert into public.memberships (workspace_id, user_id, role) values (wid, auth.uid(), 'owner');
+  insert into public.subscriptions (workspace_id, plan_code, status, trial_ends_at, current_period_start, current_period_end)
+    values (wid, 'grow', 'trialing', now() + interval '3 days', now(), now() + interval '1 month');
+  return wid;
+end;
+$$;
+
+-- Supabase rend les fonctions de public exécutables par tous : on restreint aux comptes connectés.
+revoke execute on function public.ensure_workspace(text) from public, anon;
+revoke execute on function public.create_workspace(text) from public, anon;
+grant execute on function public.ensure_workspace(text) to authenticated;
+grant execute on function public.create_workspace(text) to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
@@ -489,7 +521,7 @@ create policy audit_issues_select on public.audit_issues for select using (publi
 create policy integrations_select on public.integrations for select using (public.is_member(workspace_id));
 -- Supabase donne select sur toute la table : on le retire, puis on rend les colonnes une à une.
 revoke select on public.integrations from anon, authenticated;
-grant select (id, workspace_id, site_id, kind, config, status, last_error, last_tested_at, created_at, updated_at)
+grant select (id, workspace_id, site_id, kind, config, status, last_error, last_tested_at, demo, created_at, updated_at)
   on public.integrations to authenticated;
 
 create policy api_keys_select on public.api_keys for select using (public.is_admin(workspace_id));

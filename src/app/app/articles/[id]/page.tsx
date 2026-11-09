@@ -8,6 +8,9 @@ import { requireSite } from "@/lib/app/context";
 import { db } from "@/lib/data/store";
 import { ArticleEditor } from "./editor";
 
+/** Rédaction et analyse par l'IA : jusqu'à quelques minutes (Vercel Pro). */
+export const maxDuration = 300;
+
 export const metadata: Metadata = { title: "Article" };
 
 export default async function ArticlePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ecrit?: string }> }) {

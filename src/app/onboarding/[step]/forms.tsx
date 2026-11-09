@@ -21,7 +21,7 @@ function Actions({ label = "Continuer", back }: { label?: string; back?: string 
 export function SiteStep({ url }: { url?: string }) {
   return (
     <ActionForm action={A.onboardingSite} className="space-y-6">
-      <UrlField label="Adresse de votre site" name="url" large required autoFocus defaultValue={url?.replace(/^https:\/\//, "")} placeholder="votre-entreprise.ch" help="Nous lisons uniquement vos pages publiques." />
+      <UrlField label="Adresse de votre site" name="url" large required autoFocus defaultValue={url?.replace(/^https:\/\//, "")} placeholder="votre-entreprise.ch" help="Nous lisons uniquement vos pages publiques. L'analyse peut prendre une minute." />
       <Actions label="Analyser mon site" />
     </ActionForm>
   );
@@ -75,7 +75,7 @@ export function LanguageStep({ site }: { site: Site }) {
           <option value="it">Italien</option>
           <option value="en">Anglais</option>
         </select>
-        <p className="text-xs text-text-muted">L'offre Grow comprend une langue. En mode démo, les textes d'exemple sont en français.</p>
+        <p className="text-xs text-text-muted">L'offre Grow comprend une langue.</p>
       </div>
       <TextField label="Ton des articles" name="tone" defaultValue={site.tone} maxLength={200} help="Par exemple : chaleureux, vouvoiement, phrases courtes." />
       <Actions back="/onboarding/concurrents" />
@@ -113,7 +113,7 @@ export function OfferStep() {
         <p className="mt-2 text-2xl font-bold">99 CHF <span className="text-sm font-normal text-text-muted">/ mois après l'essai</span></p>
         <p className="mt-1 text-sm text-text-muted">30 articles par mois · 1 langue · 1 site · audit SEO</p>
       </div>
-      <p className="text-sm text-text-muted">Mode démo : aucun paiement n'est demandé. Le paiement par carte arrivera avec Stripe.</p>
+      <p className="text-sm text-text-muted">Aucun paiement n'est demandé pendant l'essai. Le paiement par carte arrivera avec Stripe.</p>
       <Actions label="Démarrer l'essai et préparer mes sujets" back="/onboarding/planning" />
     </ActionForm>
   );

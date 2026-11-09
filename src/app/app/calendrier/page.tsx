@@ -8,6 +8,9 @@ import { formatDay, localDate } from "@/lib/domain/dates";
 import { CalendarActions } from "./header-actions";
 import { TopicCard } from "./topic-card";
 
+/** Rédaction et analyse par l'IA : jusqu'à quelques minutes (Vercel Pro). */
+export const maxDuration = 300;
+
 export const metadata: Metadata = { title: "Calendrier" };
 
 /** S12 : calendrier des sujets, groupés par semaine. */

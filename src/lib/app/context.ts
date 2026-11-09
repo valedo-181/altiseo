@@ -1,6 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { config } from "@/lib/config";
 import { db } from "@/lib/data/store";
+import { userClient } from "@/lib/supabase/server";
 import type { Site } from "@/lib/domain/types";
 import { currentSiteId, sessionUserId } from "./session";
 
@@ -8,8 +10,15 @@ import { currentSiteId, sessionUserId } from "./session";
 export async function requireAccount() {
   const userId = await sessionUserId();
   if (!userId) redirect("/connexion");
-  const [user, workspace] = await Promise.all([db.getUser(userId), db.workspaceOf(userId)]);
-  if (!user || !workspace) redirect("/connexion");
+  const user = await db.getUser(userId);
+  if (!user) redirect("/connexion");
+  let workspace = await db.workspaceOf(userId);
+  if (!workspace && config.supabase) {
+    // Premier passage après le lien de connexion : l'espace et l'essai sont créés dans la base.
+    await (await userClient()).rpc("ensure_workspace", { ws_name: user.name ? `Espace de ${user.name}` : null });
+    workspace = await db.workspaceOf(userId);
+  }
+  if (!workspace) redirect("/connexion");
   return { user, workspace };
 }
 

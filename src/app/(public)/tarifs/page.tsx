@@ -6,7 +6,7 @@ import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Tarifs" };
 
-/** S02 : prix provisoires (replica/schema.sql) ; à fixer avec /replica-launch. */
+/** S02 : prix provisoires (supabase/migrations) ; à fixer avec /replica-launch. */
 const PLANS = [
   { code: "grow", name: "Grow", price: 99, year: 891, items: ["30 articles par mois", "1 langue", "1 site", "Audit SEO technique", "WordPress, Webflow, Shopify, webhook"], best: true },
   { code: "scale", name: "Scale", price: 249, year: 2241, items: ["60 articles par mois", "4 langues", "3 sites", "Audit SEO technique", "Accès à l'API"], best: false },

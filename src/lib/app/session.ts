@@ -3,10 +3,12 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { cookies } from "next/headers";
+import { config } from "@/lib/config";
+import { userClient } from "@/lib/supabase/server";
 
 /**
- * Session en MODE DÉMO : un cookie signé (HMAC-SHA256) avec l'identifiant du compte, sans mot de passe.
- * /replica-backend la remplace par Supabase Auth (e-mail vérifié, lien magique, Google).
+ * Session. Avec Supabase : Supabase Auth (lien de connexion par e-mail, cookies gérés par @supabase/ssr).
+ * En MODE DÉMO : un cookie signé (HMAC-SHA256) avec l'identifiant du compte, sans mot de passe.
  */
 const COOKIE = "altiseo_session";
 const SITE_COOKIE = "altiseo_site";
@@ -44,6 +46,10 @@ export function decodeSession(raw: string | undefined): string | null {
 }
 
 export async function sessionUserId(): Promise<string | null> {
+  if (config.supabase) {
+    const { data } = await (await userClient()).auth.getUser();
+    return data.user?.id ?? null;
+  }
   return decodeSession((await cookies()).get(COOKIE)?.value);
 }
 
@@ -54,6 +60,7 @@ export async function startSession(userId: string) {
 }
 
 export async function endSession() {
+  if (config.supabase) await (await userClient()).auth.signOut();
   const c = await cookies();
   c.delete(COOKIE);
   c.delete(SITE_COOKIE);

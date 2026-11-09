@@ -8,8 +8,10 @@ technique du site.
 État : **première version en mode démo**. Le parcours complet marche : inscription → site → 7 étapes
 de configuration → calendrier de 30 sujets → écrire un article → le corriger → l'envoyer à WordPress.
 En mode démo, les données sont dans `.data/demo.json`, les articles sont des **textes d'exemple
-(sans IA)** et **rien n'est envoyé** à WordPress. La vraie base (Supabase), l'IA (Claude),
-les mots-clés (DataForSEO) et le paiement (Stripe) arrivent avec l'étape backend.
+(sans IA)** et **rien n'est envoyé** à WordPress. Dès que les clés sont dans `.env.local`, la vraie base
+(Supabase), la rédaction (Claude) et l'envoi à WordPress prennent le relais : voir `.env.example` et
+`replica/backend.md` (mise en route pas à pas). Mots-clés (DataForSEO), paiement (Stripe), e-mails
+(Resend) et publication quotidienne restent à faire.
 Détail écran par écran : `replica/build-log.md`.
 
 ## Plans
@@ -18,7 +20,8 @@ Détail écran par écran : `replica/build-log.md`.
 | --- | --- |
 | `replica/recon.md`, `replica/features.csv` | ce que fait le produit : écrans, parcours, 54 fonctions classées |
 | `replica/architecture.md` | technique, rédaction par l'IA, API, ordre de construction |
-| `replica/schema.sql` | base de données (18 tables, RLS), testée par `npm run test:db` |
+| `supabase/migrations/` | base de données (18 tables, RLS), testée par `npm run test:db` |
+| `replica/backend.md` | services branchés, mise en route, liste de sécurité |
 | `replica/design/` | jetons, composants (`components.md`) |
 | `replica/brand.md` | nom, couleurs, logo, ton |
 

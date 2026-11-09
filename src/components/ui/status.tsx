@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, CircleDashed, Clock, FileText, PenLine, SkipForward, ThumbsUp } from "lucide-react";
 import { cx } from "@/lib/cx";
 
-/** États d'un sujet du calendrier et d'un article (voir replica/schema.sql). */
+/** États d'un sujet du calendrier et d'un article (voir supabase/migrations). */
 export type Status = "proposed" | "approved" | "generating" | "draft" | "scheduled" | "published" | "failed" | "skipped";
 
 const STATUS: Record<Status, { label: string; tone: string; Icon: typeof Check }> = {

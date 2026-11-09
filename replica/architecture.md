@@ -78,7 +78,7 @@ prendre après mesure de la qualité.
 
 Tables : 18. Accès : **Row Level Security** sur toutes les tables, comme Titanor. Chaque table métier
 porte `workspace_id` ; `is_member()` / `is_admin()` décident. Le SQL complet est dans
-`replica/schema.sql`, testé par `replica/tests/run.sh` (8 vérifications).
+`supabase/migrations`, testé par `replica/tests/run.sh` (8 vérifications).
 
 | table | rôle | écrit par |
 | --- | --- | --- |

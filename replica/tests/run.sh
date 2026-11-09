@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Teste replica/schema.sql sur un Postgres 16 local jetable, avec l'imitation de Supabase du dépôt.
+# Teste les migrations de supabase/migrations sur un Postgres 16 local jetable, avec l'imitation de Supabase du dépôt.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 STUB="$HERE/supabase_stub.sql"
@@ -12,5 +12,5 @@ PSQL=(psql -h "$DATA" -p "$PORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -q)
 "${PSQL[@]}" -f "$STUB"
 # Comme Supabase : droits par défaut sur les tables créées ensuite
 "${PSQL[@]}" -c "grant usage on schema public to authenticated, anon; alter default privileges in schema public grant all on tables to authenticated, anon;"
-"${PSQL[@]}" -f "$HERE/../schema.sql"
+for f in "$HERE"/../../supabase/migrations/*.sql; do "${PSQL[@]}" -f "$f"; done
 "${PSQL[@]}" -f "$HERE/schema_test.sql"

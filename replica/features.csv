@@ -1,33 +1,33 @@
 feature,area,priority,original,clone,notes
-Inscription par e-mail avec vérification,compte,must,yes,partial,"démo : e-mail seul, sans mot de passe ni vérification (Supabase Auth avec /replica-backend)"
+Inscription par e-mail avec vérification,compte,must,yes,partial,"Supabase Auth par lien e-mail (vérifie l'adresse) écrit, à tester sur le projet ; démo sans vérification"
 Connexion Google,compte,should,yes,no,déduit
-Saisir l'URL du site et lancer l'analyse,onboarding,must,yes,partial,"URL validée et normalisée ; analyse démo : nom et langue devinés du domaine, pas de lecture du site"
-Description de l'activité et du public pré-remplies depuis le site,onboarding,must,yes,partial,champs présents ; préremplissage réel avec l'analyse IA
+Saisir l'URL du site et lancer l'analyse,onboarding,must,yes,partial,"analyse réelle (page d'accueil + Claude) écrite, à tester avec une clé ; démo : nom et langue devinés"
+Description de l'activité et du public pré-remplies depuis le site,onboarding,must,yes,partial,préremplies par Claude quand la clé est là
 Concurrents suggérés (3 minimum) modifiables,onboarding,must,yes,partial,"saisie manuelle (0 à 10), sans suggestions"
 Choix de la langue des articles,onboarding,must,yes,yes,"FR, DE, IT, EN ; textes démo en français"
 Choix du ton / voix de marque,onboarding,should,yes,yes,S07 ; déduit
 Détection du CMS depuis le domaine,onboarding,should,yes,no,S08
 Heure de publication quotidienne et fuseau,onboarding,must,yes,yes,"heure, fuseau, jours ; le cron de publication automatique reste à faire"
 Essai gratuit de 3 jours avec carte,facturation,must,yes,partial,essai de 3 jours sans carte ; Stripe avec /replica-backend
-Calendrier de 30 jours de sujets généré,calendrier,must,yes,partial,"30 sujets à partir des modèles démo (45), jours de publication respectés"
+Calendrier de 30 jours de sujets généré,calendrier,must,yes,partial,"Claude (30 sujets, sans doublon) ou modèles démo ; volume et difficulté avec DataForSEO"
 Volume de recherche et difficulté par sujet,calendrier,must,yes,partial,"affichage prêt, valeurs vides sans DataForSEO"
 Approuver un sujet,calendrier,must,yes,yes,un par un ou tous
 Régénérer ou remplacer un sujet,calendrier,must,yes,yes,5 fois au plus par sujet ; démo : modèles de rechange
 Ajouter un sujet à la main,calendrier,could,unknown,no,non vu dans les sources
-Rédaction automatique d'un article par jour,articles,must,yes,partial,« Écrire maintenant » à la demande ; texte démo sans IA ; la tâche quotidienne reste à faire
+Rédaction automatique d'un article par jour,articles,must,yes,partial,rédaction Claude à la demande écrite ; la tâche quotidienne reste à faire
 Article optimisé SEO (titres H2/H3 / méta-titre / méta-description / slug),articles,must,yes,yes,"structure, méta aux bonnes longueurs, slug unique"
 Jusqu'à 10 liens internes vers les articles du site,articles,must,yes,partial,liens vers les articles déjà écrits ; pas encore vers les autres pages du site
 Section « articles recommandés » en fin d'article,articles,should,yes,partial,« Pour aller plus loin » quand des articles existent
 Données structurées schema JSON-LD dans l'article,articles,should,yes,no,
 Image à la une générée,articles,should,yes,no,réglages visuels
 Vidéo intégrée dans l'article,articles,could,yes,no,une seule source
-Instructions de rédaction perso (1000 caractères),réglages,must,yes,partial,enregistrées ; prises en compte avec la rédaction IA
-Option « mentionner les concurrents quand c'est pertinent »,réglages,should,yes,partial,réglage enregistré ; utilisé par la rédaction IA
+Instructions de rédaction perso (1000 caractères),réglages,must,yes,yes,transmises à Claude
+Option « mentionner les concurrents quand c'est pertinent »,réglages,should,yes,yes,transmise à Claude
 Mode brouillon (relecture avant publication),publication,must,yes,yes,réglage par défaut
 Liste des articles avec statut,articles,must,yes,yes,filtre par état
 Éditer un article avant ou après publication,articles,should,partial,yes,Markdown simple + aperçu + panneau SEO + aperçu Google
-Republier un article modifié sur le CMS,publication,should,yes,partial,même billet mis à jour (simulation)
-Publication WordPress (plugin + clé API),publication,must,yes,partial,"API REST + mot de passe d'application, sans plugin ; envoi simulé en démo"
+Republier un article modifié sur le CMS,publication,should,yes,partial,"mise à jour du même billet, recréé s'il a été supprimé"
+Publication WordPress (plugin + clé API),publication,must,yes,partial,"API REST + mot de passe d'application, sans plugin ; envoi réel écrit et testé avec un faux serveur"
 Publication par webhook (sites sur mesure),publication,must,yes,no,
 API publique (lire les articles / mots-clés),publication,should,yes,no,docs API
 Publication Webflow,publication,should,yes,no,
@@ -35,7 +35,7 @@ Publication Shopify (blog),publication,should,yes,no,
 Publication Framer,publication,could,yes,no,plugin Framer à écrire
 Publication Wix,publication,could,yes,no,
 Publication Ghost,publication,could,yes,no,sources partagées
-Tester une connexion CMS et voir l'erreur,publication,must,yes,partial,contrôle de forme seulement en démo
+Tester une connexion CMS et voir l'erreur,publication,must,yes,partial,"test réel (users/me, droit d'écrire) avec messages clairs ; démo : contrôle de forme"
 Reprise automatique si la publication échoue,publication,must,unknown,no,déduit ; indispensable
 Audit technique : schema / balises méta / liens cassés / alt / sitemap,audit,must,yes,no,G2
 Audit technique : vitesse des pages,audit,should,yes,no,PageSpeed Insights API

@@ -1,0 +1,55 @@
+feature,area,priority,original,clone,notes
+Inscription par e-mail avec vérification,compte,must,yes,no,
+Connexion Google,compte,should,yes,no,déduit
+Saisir l'URL du site et lancer l'analyse,onboarding,must,yes,no,S04
+Description de l'activité et du public pré-remplies depuis le site,onboarding,must,yes,no,S05
+Concurrents suggérés (3 minimum) modifiables,onboarding,must,yes,no,S06
+Choix de la langue des articles,onboarding,must,yes,no,S07 ; nombre de langues lié à l'offre
+Choix du ton / voix de marque,onboarding,should,yes,no,S07 ; déduit
+Détection du CMS depuis le domaine,onboarding,should,yes,no,S08
+Heure de publication quotidienne et fuseau,onboarding,must,yes,no,S09
+Essai gratuit de 3 jours avec carte,facturation,must,yes,no,S10
+Calendrier de 30 jours de sujets généré,calendrier,must,yes,no,S12
+Volume de recherche et difficulté par sujet,calendrier,must,yes,no,S12 ; fournisseur de données payant
+Approuver un sujet,calendrier,must,yes,no,F02
+Régénérer ou remplacer un sujet,calendrier,must,yes,no,F02 ; plafonner le coût IA
+Ajouter un sujet à la main,calendrier,could,unknown,no,non vu dans les sources
+Rédaction automatique d'un article par jour,articles,must,yes,no,F03 ; tâche de fond
+Article optimisé SEO (titres H2/H3 / méta-titre / méta-description / slug),articles,must,yes,no,
+Jusqu'à 10 liens internes vers les articles du site,articles,must,yes,no,docs qualité ; nécessite l'exploration du site
+Section « articles recommandés » en fin d'article,articles,should,yes,no,docs qualité
+Données structurées schema JSON-LD dans l'article,articles,should,yes,no,
+Image à la une générée,articles,should,yes,no,réglages visuels
+Vidéo intégrée dans l'article,articles,could,yes,no,une seule source
+Instructions de rédaction perso (1000 caractères),réglages,must,yes,no,docs réglages
+Option « mentionner les concurrents quand c'est pertinent »,réglages,should,yes,no,docs réglages
+Mode brouillon (relecture avant publication),publication,must,yes,no,plugin WordPress
+Liste des articles avec statut,articles,must,yes,no,S13
+Éditer un article avant ou après publication,articles,should,partial,no,l'original a une édition limitée (piste d'amélioration)
+Republier un article modifié sur le CMS,publication,should,yes,no,plugin : création et mise à jour
+Publication WordPress (plugin + clé API),publication,must,yes,no,plugin à écrire soi-même
+Publication par webhook (sites sur mesure),publication,must,yes,no,
+API publique (lire les articles / mots-clés),publication,should,yes,no,docs API
+Publication Webflow,publication,should,yes,no,
+Publication Shopify (blog),publication,should,yes,no,
+Publication Framer,publication,could,yes,no,plugin Framer à écrire
+Publication Wix,publication,could,yes,no,
+Publication Ghost,publication,could,yes,no,sources partagées
+Tester une connexion CMS et voir l'erreur,publication,must,yes,no,S17
+Reprise automatique si la publication échoue,publication,must,unknown,no,déduit ; indispensable
+Audit technique : schema / balises méta / liens cassés / alt / sitemap,audit,must,yes,no,G2
+Audit technique : vitesse des pages,audit,should,yes,no,PageSpeed Insights API
+Score d'audit et problèmes classés par gravité,audit,must,yes,no,S15
+Recommandation de correction par problème,audit,should,yes,no,S16
+Relancer l'audit et suivre les corrections,audit,could,unknown,no,déduit
+Tableau de bord (articles publiés / prochains / trafic),tableau de bord,should,yes,no,S11 ; trafic = Google Search Console à connecter
+Abonnement Stripe mensuel et annuel (-25 %),facturation,must,yes,no,
+Quota d'articles par mois selon l'offre,facturation,must,yes,no,
+Changer d'offre et annuler en un clic,facturation,should,yes,no,portail Stripe
+Plusieurs sites par compte,compte,could,unknown,no,supposition
+Réseau d'échange de backlinks,backlinks,could,yes,skip,leur réseau de membres ; schéma de liens contraire aux règles anti-spam de Google
+Suivi de visibilité dans ChatGPT / Claude / Gemini / Perplexity,visibilité IA,should,yes,skip,exclu du périmètre choisi
+Leads Reddit et Quora,social,could,yes,skip,hors périmètre
+Contenu pour les réseaux sociaux,social,could,yes,skip,hors périmètre
+Garantie 90 jours satisfait ou remboursé,commercial,could,yes,skip,décision commerciale pas une fonction
+Données de mots-clés propriétaires,données,must,yes,skip,à remplacer par votre propre fournisseur (DataForSEO / Semrush / Keyword Planner)

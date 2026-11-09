@@ -1,0 +1,91 @@
+/* Généré par build_tokens.py depuis tokens.json. Ne pas modifier à la main. */
+:root {
+  --c-bg: 255 255 255;
+  --c-surface: 246 247 249;
+  --c-surface-sunken: 238 240 243;
+  --c-border: 228 231 236;
+  --c-border-input: 133 141 153;
+  --c-text: 18 22 28;
+  --c-text-muted: 90 99 113;
+  --c-accent: 11 107 105;
+  --c-accent-hover: 9 87 85;
+  --c-accent-soft: 227 241 240;
+  --c-on-accent: 255 255 255;
+  --c-focus: 11 107 105;
+  --c-danger: 180 35 24;
+  --c-danger-soft: 254 243 242;
+  --c-warning: 147 55 13;
+  --c-warning-soft: 255 250 235;
+  --c-success: 6 118 71;
+  --c-success-soft: 236 253 243;
+  --c-info: 23 92 211;
+  --c-info-soft: 239 248 255;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-serif: Source Serif 4, Georgia, Cambria, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.08);
+  --shadow-pop: 0 12px 32px rgba(16,24,40,.16), 0 2px 6px rgba(16,24,40,.08);
+  --shadow-focus: 0 0 0 2px rgb(var(--c-bg)), 0 0 0 4px rgb(var(--c-focus));
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-ease: cubic-bezier(.2,.8,.2,1);
+  --layout-sidebar: 248px;
+  --layout-topbar: 56px;
+  --layout-content-max: 1200px;
+  --layout-reading-max: 720px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --c-bg: 14 17 22;
+    --c-surface: 22 26 33;
+    --c-surface-sunken: 29 34 43;
+    --c-border: 42 48 58;
+    --c-border-input: 115 124 138;
+    --c-text: 238 241 245;
+    --c-text-muted: 163 171 184;
+    --c-accent: 94 201 195;
+    --c-accent-hover: 138 219 214;
+    --c-accent-soft: 17 48 47;
+    --c-on-accent: 14 17 22;
+    --c-focus: 94 201 195;
+    --c-danger: 249 112 102;
+    --c-danger-soft: 58 21 18;
+    --c-warning: 253 176 34;
+    --c-warning-soft: 51 37 10;
+    --c-success: 71 205 137;
+    --c-success-soft: 12 44 29;
+    --c-info: 132 202 255;
+    --c-info-soft: 15 39 64;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --c-bg: 14 17 22;
+  --c-surface: 22 26 33;
+  --c-surface-sunken: 29 34 43;
+  --c-border: 42 48 58;
+  --c-border-input: 115 124 138;
+  --c-text: 238 241 245;
+  --c-text-muted: 163 171 184;
+  --c-accent: 94 201 195;
+  --c-accent-hover: 138 219 214;
+  --c-accent-soft: 17 48 47;
+  --c-on-accent: 14 17 22;
+  --c-focus: 94 201 195;
+  --c-danger: 249 112 102;
+  --c-danger-soft: 58 21 18;
+  --c-warning: 253 176 34;
+  --c-warning-soft: 51 37 10;
+  --c-success: 71 205 137;
+  --c-success-soft: 12 44 29;
+  --c-info: 132 202 255;
+  --c-info-soft: 15 39 64;
+  color-scheme: dark;
+}

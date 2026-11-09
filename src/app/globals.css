@@ -1,0 +1,44 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/source-serif-4";
+@import "../styles/tokens.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-serif: "Source Serif 4 Variable", Georgia, Cambria, serif;
+  }
+  html { @apply bg-bg text-text font-sans antialiased; }
+  h1, h2, h3 { font-weight: 650; letter-spacing: -0.01em; }
+  :focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+}
+
+/* Primitives : les composants s'appuient sur ces classes (voir src/components/ui). */
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md text-sm font-semibold transition-colors duration-fast select-none whitespace-nowrap; }
+  .btn:disabled { @apply opacity-50 cursor-not-allowed; }
+  .btn[aria-busy="true"] { @apply cursor-progress; }
+  .btn-primary { @apply bg-accent text-on-accent hover:bg-accent-hover; }
+  .btn-secondary { @apply bg-bg text-text border border-border-input hover:bg-surface; }
+  .btn-ghost { @apply text-text hover:bg-surface-sunken; }
+  .btn-danger { @apply bg-danger text-on-accent hover:opacity-90; }
+  .btn-xs { @apply h-7 px-2 text-xs; }
+  .btn-sm { @apply h-8 px-3; }
+  .btn-lg { @apply h-12 px-6 text-base; }
+  .btn-icon { @apply w-10 px-0; }
+  .btn-icon.btn-sm { @apply w-8; }
+
+  .field { @apply h-10 w-full px-3 rounded-md bg-bg border border-border-input text-base text-text placeholder:text-text-muted; }
+  textarea.field { @apply h-auto py-2 leading-6; }
+  .field:focus, .field:focus-within { box-shadow: var(--shadow-focus); outline: none; }
+  .field[aria-invalid="true"], .field:has([aria-invalid="true"]) { @apply border-danger; }
+  .field-lg { @apply h-12; }
+
+  .pill { @apply inline-flex items-center gap-1 h-6 px-2 rounded-pill text-xs font-medium whitespace-nowrap; }
+  .card { @apply rounded-lg border border-border bg-bg p-4 shadow-card; }
+}

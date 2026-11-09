@@ -7,7 +7,7 @@
 
 | service | code | état |
 | --- | --- | --- |
-| Base de données | `supabase/migrations/`, `src/lib/data/supabase-store.ts` | écrit, migration testée en local (9 vérifications) ; **pas encore appliqué sur un projet Supabase** |
+| Base de données | `supabase/migrations/`, `src/lib/data/supabase-store.ts` | **appliqué** sur le projet Supabase « altiseo » (eu-west-1) le 2026-11-09 : 2 migrations ; 10 vérifications locales ; contrôles Supabase propres (restent 4 avertissements voulus, voir plus bas) |
 | Connexion | Supabase Auth, lien par e-mail, `src/app/auth/callback/route.ts`, `ensure_workspace()` | écrit ; à tester sur le projet |
 | Rédaction | `src/lib/ai/claude.ts` : analyse du site, 30 sujets, articles | écrit, testé avec un faux client (7 tests) ; **pas encore appelé avec une vraie clé** |
 | WordPress | `src/lib/cms/wordpress.ts` : API REST + mot de passe d'application | écrit, testé avec un faux serveur (4 tests) ; à tester sur un vrai site |
@@ -19,10 +19,9 @@
 
 ## Mise en route (à faire par vous)
 
-1. **Supabase** : créer un projet « Altiseo » (région Frankfurt ou Zurich). Copier l'URL, la clé `anon`
-   et la clé `service_role` dans `.env.local`.
-2. **Schéma** : SQL Editor → exécuter `supabase/migrations/20261109000000_init.sql`
-   (ou `supabase link` puis `supabase db push`).
+1. ~~**Supabase** : projet créé (« altiseo », eu-west-1).~~ Copier l'URL, la clé `anon` et la clé
+   `service_role` (Project Settings → API) dans `.env.local` et dans Vercel.
+2. ~~**Schéma** : les deux fichiers de `supabase/migrations/` sont appliqués.~~
 3. **Connexion** : Authentication → URL Configuration → *Site URL* = l'adresse de l'app ;
    *Redirect URLs* : `<adresse>/auth/callback`. Les liens de connexion arrivent par l'e-mail de Supabase
    (limité à quelques envois par heure : brancher un SMTP, par exemple Resend, avant d'ouvrir au public).
@@ -63,3 +62,10 @@
 - [x] appels sortants (lecture du site, WordPress) limités aux adresses publiques, sans redirection
       suivie pour WordPress, avec délai maximal
 - [x] HTML des articles produit par un convertisseur qui échappe tout (pas d'injection de script)
+
+## Contrôles Supabase (security advisor) : avertissements voulus
+
+- `articles_left`, `is_member`, `is_admin`, `ensure_workspace` sont exécutables par les comptes connectés :
+  c'est nécessaire (règles RLS et premier accès) et chacune vérifie elle-même l'appartenance à l'espace
+  ou n'agit que sur le compte connecté.
+- `jobs`, `stripe_events`, `ai_batches` ont la RLS sans aucune règle : volontaire, seul le serveur y accède.

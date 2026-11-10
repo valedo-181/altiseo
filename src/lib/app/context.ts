@@ -17,6 +17,11 @@ export async function requireAccount() {
     // Premier passage après le lien de connexion : l'espace et l'essai sont créés dans la base.
     await (await userClient()).rpc("ensure_workspace", { ws_name: user.name ? `Espace de ${user.name}` : null });
     workspace = await db.workspaceOf(userId);
+    if (!workspace) {
+      // Espace suspendu par le super admin : la base ne le montre plus à ses membres.
+      const { data } = await (await userClient()).rpc("my_suspension");
+      if (Array.isArray(data) && data.length) redirect("/suspendu");
+    }
   }
   if (!workspace) redirect("/connexion");
   return { user, workspace };

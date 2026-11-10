@@ -69,3 +69,16 @@
   c'est nécessaire (règles RLS et premier accès) et chacune vérifie elle-même l'appartenance à l'espace
   ou n'agit que sur le compte connecté.
 - `jobs`, `stripe_events`, `ai_batches` ont la RLS sans aucune règle : volontaire, seul le serveur y accède.
+
+## Console super admin (`/admin`)
+
+- Accès : compte listé dans `platform_admins` + double authentification (TOTP, session `aal2`). Un compte
+  non listé reçoit « page introuvable ». La base revérifie à chaque appel (fonctions `admin_*`).
+- Écrans : clients (revenu, essais, santé, filtres), fiche client (prolonger l'essai, changer d'offre,
+  suspendre / réactiver), coûts IA et marge, suivi technique (échecs, relance), journal.
+- Un client suspendu perd l'accès (RLS) et voit `/suspendu` avec la raison.
+- Ajouter un administrateur (SQL Editor) :
+  `insert into public.platform_admins (user_id) select id from auth.users where email = '…';`
+- Supabase : Authentication → Sign In / Providers → Multi-Factor → TOTP doit être activé.
+- Testé : 6 vérifications SQL (`replica/tests/admin_test.sql`), 5 tests des calculs. Les écrans n'ont pas
+  encore été essayés sur le vrai projet (il faut un compte admin connecté).

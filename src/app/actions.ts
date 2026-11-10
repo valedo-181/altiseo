@@ -30,6 +30,7 @@ async function sendMagicLink(email: string, name: string | null, create: boolean
     email,
     options: { emailRedirectTo: `${origin}/auth/callback`, shouldCreateUser: create, data: name ? { name } : undefined },
   });
+  if (error) console.error("auth.signInWithOtp", { status: error.status, code: (error as { code?: string }).code, message: error.message });
   if (error && error.status === 429) return { error: "Trop de demandes. Réessayez dans quelques minutes." };
   if (error && !/not allowed|signups not allowed|user not found/i.test(error.message)) return { error: "L'e-mail n'a pas pu être envoyé. Réessayez." };
   return { ok: `Si l'adresse est correcte, un lien de connexion vient d'être envoyé à ${email}. Il est valable une heure.` };

@@ -14,3 +14,4 @@ PSQL=(psql -h "$DATA" -p "$PORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -q)
 "${PSQL[@]}" -c "grant usage on schema public to authenticated, anon; alter default privileges in schema public grant all on tables to authenticated, anon;"
 for f in "$HERE"/../../supabase/migrations/*.sql; do "${PSQL[@]}" -f "$f"; done
 "${PSQL[@]}" -f "$HERE/schema_test.sql"
+"${PSQL[@]}" -f "$HERE/admin_test.sql"

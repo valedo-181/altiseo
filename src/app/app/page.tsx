@@ -7,6 +7,7 @@ import { Card, KpiCard, QuotaBar, ScoreGauge } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { StatusPill } from "@/components/ui/status";
 import { requireSite } from "@/lib/app/context";
+import { cronMode } from "@/lib/config";
 import { db } from "@/lib/data/store";
 import { formatDay, localDate } from "@/lib/domain/dates";
 
@@ -29,7 +30,7 @@ export default async function Dashboard() {
         <KpiCard label="Articles publiés" value={published} hint={drafts ? `${drafts} brouillon${drafts > 1 ? "s" : ""} à relire` : "Aucun brouillon en attente"} />
         <KpiCard
           label="Prochain article"
-          value={<span className="text-lg">{next ? `${formatDay(next.scheduledFor)}, ${site.publishTime}` : "—"}</span>}
+          value={<span className="text-lg">{next ? (cronMode === "hourly" ? `${formatDay(next.scheduledFor)}, ${site.publishTime}` : `${formatDay(next.scheduledFor)}, le matin`) : "—"}</span>}
           hint={next ? next.title : "Aucun sujet prévu"}
         />
         <Card>
@@ -56,7 +57,7 @@ export default async function Dashboard() {
         <h2 id="h-last" className="text-lg">Derniers articles</h2>
         {articles.length === 0 ? (
           <EmptyState icon={FileText} title="Pas encore d'article" action={<Link href="/app/calendrier" className={buttonClass("primary", "sm")}><CalendarDays aria-hidden="true" className="size-4" />Écrire depuis le calendrier</Link>}>
-            {next ? `Le premier est prévu ${formatDay(next.scheduledFor, { weekday: "long", day: "numeric", month: "long" })} à ${site.publishTime}. Vous pouvez aussi l'écrire maintenant.` : "Préparez vos sujets dans le calendrier."}
+            {next ? `Le premier est prévu ${formatDay(next.scheduledFor, { weekday: "long", day: "numeric", month: "long" })} ${cronMode === "hourly" ? `à ${site.publishTime}` : "au matin"}. Vous pouvez aussi l'écrire maintenant.` : "Préparez vos sujets dans le calendrier."}
           </EmptyState>
         ) : (
           <Card className="divide-y divide-border p-0">

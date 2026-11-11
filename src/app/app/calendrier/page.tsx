@@ -3,6 +3,7 @@ import { CalendarDays } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Banner, EmptyState } from "@/components/ui/feedback";
 import { requireSite } from "@/lib/app/context";
+import { cronMode } from "@/lib/config";
 import { db } from "@/lib/data/store";
 import { formatDay, localDate } from "@/lib/domain/dates";
 import { CalendarActions } from "./header-actions";
@@ -36,7 +37,7 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
     <>
       <PageHeader
         title="Calendrier"
-        lead={items.length ? `${items.length} sujets, publiés à ${site.publishTime} (${site.timezone.replace("_", " ")}). ${proposed ? `${proposed} à approuver.` : "Tout est approuvé."}` : "Vos sujets d'articles, jour par jour."}
+        lead={items.length ? `${items.length} sujets. Un sujet approuvé s'écrit tout seul ${cronMode === "hourly" ? `à ${site.publishTime} (${site.timezone.replace("_", " ")})` : "tôt le matin"} le jour prévu. ${proposed ? `${proposed} à approuver.` : "Tout est approuvé."}` : "Vos sujets d'articles, jour par jour."}
         actions={<CalendarActions empty={!items.length} />}
       />
       {nouveau && items.length > 0 && (

@@ -16,7 +16,7 @@
 | Mots-clés | DataForSEO | à faire |
 | Paiement | Stripe Checkout + portail + webhooks | à faire |
 | E-mails | Resend (article prêt, échec, fin d'essai) | à faire ; les e-mails de connexion partent par Supabase |
-| Tâches | file `jobs`, crons Vercel (publication quotidienne, lot de nuit) | à faire |
+| Tâches | file `jobs`, crons Vercel (publication quotidienne, lot de nuit) | fait : passage quotidien (`/api/cron/daily`) ; file `jobs` non utilisée |
 
 ## Mise en route (à faire par vous)
 
@@ -123,3 +123,22 @@ consentement OAuth (portée `webmasters.readonly`, portée « sensible » : vali
 avant d'ouvrir au public, sinon écran « application non validée » et 100 comptes de test au plus),
 ID client OAuth « Application Web » avec l'URI `https://<domaine>/app/mots-cles/google/callback`.
 Pas encore testé contre le vrai Google (réseau fermé depuis l'environnement de développement).
+
+
+## Publication automatique (tâche quotidienne)
+
+`GET /api/cron/daily`, appelée par Vercel Cron (`vercel.json`, 04:00 UTC) avec `Authorization: Bearer $CRON_SECRET`.
+Code : `src/lib/jobs/` (`select.ts` pur et testé, `daily.ts`), fonction SQL `automation_due()` (service_role seulement).
+
+- Pour chaque sujet **approuvé** dont le jour est arrivé (fuseau du site) : réservation du sujet, écriture
+  de l'article (Claude), puis envoi au site si une intégration est connectée (brouillon ou publié selon le
+  réglage). Sans intégration : l'article reste en brouillon dans Altiseo.
+- Écartés : espace suspendu, essai terminé, abonnement inactif, site encore en onboarding, quota atteint,
+  sujet vieux de plus de deux jours. Un échec d'écriture est repris au passage suivant.
+- Pas de session : `runAsSystem()` (src/lib/supabase/server.ts) fait travailler la couche de données en
+  service_role, uniquement dans cette tâche et avec des identifiants lus dans la base.
+- Limites : trois articles en parallèle, plus de nouvel article après 2 minutes ; le reste est reporté
+  (`postponed`). Avec un seul passage par jour, cela couvre une poignée de sites. Au-delà : passage
+  horaire (Vercel Pro, `CRON_MODE=hourly`, respecte alors l'heure de publication du site) ou file de tâches.
+- Un envoi WordPress raté n'est pas retenté tout seul : l'erreur se voit sur l'article, bouton « Envoyer ».
+- Pas encore : e-mail « article prêt » (attend Resend), journal des passages dans la console admin.

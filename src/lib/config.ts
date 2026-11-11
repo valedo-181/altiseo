@@ -16,6 +16,9 @@ export const config = {
 
 export const demoMode = !config.supabase;
 
+/** Rythme de la tâche automatique : « daily » (un passage par jour, par défaut) ou « hourly » (CRON_MODE=hourly). */
+export const cronMode: "daily" | "hourly" = process.env.CRON_MODE === "hourly" ? "hourly" : "daily";
+
 /**
  * Adresse publique de l'application (liens de connexion par e-mail). On prend d'abord l'adresse sur
  * laquelle la personne se trouve (toujours juste), puis NEXT_PUBLIC_SITE_URL si elle manque.

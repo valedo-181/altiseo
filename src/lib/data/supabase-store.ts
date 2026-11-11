@@ -2,6 +2,7 @@ import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
 import type { Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { DueTopic } from "@/lib/jobs/select";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
 /**
@@ -356,5 +357,24 @@ export const supabaseDb = {
     await siteOf(workspaceId, siteId);
     check(await adminClient().from("search_connections").delete().eq("site_id", siteId));
   },
+
+  // Publication automatique (tâche de fond, service_role) -------------------
+  async automationDue(): Promise<DueTopic[]> {
+    return ((check(await adminClient().rpc("automation_due")) as Row[] | null) ?? []).map((r) => ({
+      workspaceId: s(r.workspace_id), siteId: s(r.site_id), itemId: s(r.item_id), scheduledFor: s(r.scheduled_for),
+      publishTime: s(r.publish_time), timezone: s(r.timezone), articlesLeft: Number(r.articles_left),
+    }));
+  },
+  /** Réserve un sujet pour l'écrire : un seul passage peut le prendre. */
+  async claimTopic(workspaceId: string, itemId: string): Promise<boolean> {
+    const rows = check(await adminClient().from("calendar_items").update({ status: "generating", updated_at: new Date().toISOString() })
+      .eq("id", itemId).eq("workspace_id", workspaceId).in("status", ["approved", "generating"]).select("id")) as Row[] | null;
+    return Boolean(rows?.length);
+  },
+  /** Rend le sujet après un échec : il sera repris au passage suivant. */
+  async releaseTopic(workspaceId: string, itemId: string) {
+    check(await adminClient().from("calendar_items").update({ status: "approved" }).eq("id", itemId).eq("workspace_id", workspaceId).eq("status", "generating"));
+  },
 };
+
 

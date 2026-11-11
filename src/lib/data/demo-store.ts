@@ -31,6 +31,7 @@ type Doc = {
 const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
+import type { DueTopic } from "@/lib/jobs/select";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
 // Next.js peut charger ce module plusieurs fois (un exemplaire par groupe de pages) : le cache et la
@@ -386,6 +387,44 @@ export const demoDb = {
     await write((d) => {
       siteOf(d, siteId, workspaceId);
       d.search = d.search.filter((x) => x.siteId !== siteId);
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Publication automatique (tâche de fond)
+  // -------------------------------------------------------------------------
+
+  async automationDue(): Promise<DueTopic[]> {
+    return read((d) => {
+      const out: DueTopic[] = [];
+      for (const c of d.calendar) {
+        if (c.status !== "approved" && c.status !== "generating") continue;
+        if (d.articles.some((a) => a.calendarItemId === c.id)) continue;
+        const site = d.sites.find((x) => x.id === c.siteId);
+        const sub = site && d.subscriptions.find((x) => x.workspaceId === site.workspaceId);
+        if (!site || !sub || site.onboardingStep < 8) continue;
+        const live = sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now()));
+        if (!live) continue;
+        out.push({ workspaceId: site.workspaceId, siteId: site.id, itemId: c.id, scheduledFor: c.scheduledFor, publishTime: site.publishTime, timezone: site.timezone, articlesLeft: sub.articlesPerMonth - articlesUsedIn(d, site.workspaceId, sub) });
+      }
+      return out;
+    });
+  },
+  async claimTopic(workspaceId: string, itemId: string): Promise<boolean> {
+    return write((d) => {
+      const c = d.calendar.find((x) => x.id === itemId);
+      if (!c || (c.status !== "approved" && c.status !== "generating")) return false;
+      siteOf(d, c.siteId, workspaceId);
+      c.status = "generating";
+      return true;
+    });
+  },
+  async releaseTopic(workspaceId: string, itemId: string) {
+    await write((d) => {
+      const c = d.calendar.find((x) => x.id === itemId);
+      if (!c || c.status !== "generating") return;
+      siteOf(d, c.siteId, workspaceId);
+      c.status = "approved";
     });
   },
 };

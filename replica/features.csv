@@ -37,12 +37,12 @@ Publication Wix,publication,could,yes,no,
 Publication Ghost,publication,could,yes,no,sources partagées
 Tester une connexion CMS et voir l'erreur,publication,must,yes,partial,"test réel (users/me, droit d'écrire) avec messages clairs ; démo : contrôle de forme"
 Reprise automatique si la publication échoue,publication,must,unknown,no,déduit ; indispensable
-Audit technique : schema / balises méta / liens cassés / alt / sitemap,audit,must,yes,no,G2
-Audit technique : vitesse des pages,audit,should,yes,no,PageSpeed Insights API
-Score d'audit et problèmes classés par gravité,audit,must,yes,no,S15
-Recommandation de correction par problème,audit,should,yes,no,S16
-Relancer l'audit et suivre les corrections,audit,could,unknown,no,déduit
-Tableau de bord (articles publiés / prochains / trafic),tableau de bord,should,yes,partial,"articles, prochain sujet, quota ; pas de trafic"
+Audit technique : schema / balises méta / liens cassés / alt / sitemap,audit,must,yes,yes,"15 contrôles, 30 pages lues au plus ; pas encore essayé sur un vrai site en ligne"
+Audit technique : vitesse des pages,audit,should,yes,yes,PageSpeed Insights (téléphone) ; clé PAGESPEED_API_KEY conseillée
+Score d'audit et problèmes classés par gravité,audit,must,yes,yes,"note sur 100, critique / moyen / info"
+Recommandation de correction par problème,audit,should,yes,yes,pourquoi + comment corriger + pages concernées
+Relancer l'audit et suivre les corrections,audit,could,unknown,partial,relance à la main (2 min d'écart) ; pas d'historique ni de « corrigé »
+Tableau de bord (articles publiés / prochains / trafic),tableau de bord,should,yes,partial,"articles, prochain sujet, quota, score d'audit ; pas de trafic"
 Abonnement Stripe mensuel et annuel (-25 %),facturation,must,yes,no,page Tarifs prête ; Stripe avec /replica-backend
 Quota d'articles par mois selon l'offre,facturation,must,yes,yes,vérifié dans la couche de données (30 en essai)
 Changer d'offre et annuler en un clic,facturation,should,yes,no,portail Stripe

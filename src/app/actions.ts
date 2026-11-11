@@ -282,3 +282,15 @@ export async function saveSchedule(_: FormState, f: FormData): Promise<FormState
   revalidatePath("/app/reglages");
   return { ok: "Planning enregistré." };
 }
+
+// ---------------------------------------------------------------------------
+// Audit (S15)
+// ---------------------------------------------------------------------------
+
+export async function startAudit(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await svc.runAudit(workspace.id, site.id);
+  revalidatePath("/app/audit");
+  revalidatePath("/app");
+  return r.ok ? { ok: `Audit terminé : ${r.value.score} sur 100.` } : { error: r.error };
+}

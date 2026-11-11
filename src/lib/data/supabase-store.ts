@@ -1,7 +1,7 @@
 import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
-import type { Article, CalendarItem, Competitor, Integration, Publication, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
 /**
@@ -286,5 +286,33 @@ export const supabaseDb = {
       status: p.status, last_error: p.error, last_attempt_at: p.lastAttemptAt,
     }, { onConflict: "article_id,integration_id" }).select("*").single());
     return toPublication(row);
+  },
+
+  // Audit ---------------------------------------------------------------------
+  /** Écrit par le serveur (service_role) après vérification du site ; les membres lisent seulement. */
+  async saveAudit(workspaceId: string, siteId: string, run: Omit<AuditRun, "id" | "siteId" | "createdAt">) {
+    await siteOf(workspaceId, siteId);
+    const ad = adminClient();
+    const at = new Date().toISOString();
+    const row = one(await ad.from("audit_runs").insert({
+      workspace_id: workspaceId, site_id: siteId, status: run.status, pages_crawled: run.pagesCrawled, score: run.score,
+      speed: run.speed, error: run.error, started_at: at, finished_at: at,
+    }).select("*").single());
+    if (run.issues.length) {
+      check(await ad.from("audit_issues").insert(run.issues.map((i) => ({
+        workspace_id: workspaceId, audit_run_id: row.id, code: i.code, level: i.level, affected: i.affected, total: i.total, pages: i.pages, detail: i.detail,
+      }))));
+    }
+    return { ...run, id: s(row.id), siteId, createdAt: s(row.created_at) } as AuditRun;
+  },
+  async latestAudit(workspaceId: string, siteId: string): Promise<AuditRun | null> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const r = check(await sb.from("audit_runs").select("*, audit_issues(*)").eq("site_id", siteId).in("status", ["done", "failed"]).order("created_at", { ascending: false }).limit(1).maybeSingle());
+    if (!r) return null;
+    const issues: AuditIssue[] = ((r.audit_issues as Row[]) ?? []).map((i) => ({
+      code: s(i.code), level: i.level as AuditIssue["level"], affected: Number(i.affected), total: Number(i.total), pages: (i.pages as string[]) ?? [], detail: (i.detail as string) ?? null,
+    }));
+    return { id: s(r.id), siteId, status: r.status, pagesCrawled: Number(r.pages_crawled), score: r.score, speed: r.speed, error: r.error, createdAt: s(r.created_at), issues };
   },
 };

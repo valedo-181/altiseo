@@ -241,7 +241,8 @@ export function scoreSite(site: SiteFacts, co: CompanyFacts): { score: number; i
   add("img_alt", imgs ? 1 - noAlt / imgs : 1, noAlt, imgs, pagesWhere(pages, (p) => p.imagesNoAlt > 0));
   add("viewport", home ? (home.viewport ? 1 : 0) : null, 0, 0);
   add("speed", site.speed ? Math.min(1, site.speed.score / 90) : null, 0, 0, [], site.speed?.score ?? null);
-  const hasLocal = pages.some((p) => p.ldTypes.some((t) => LOCAL_TYPES.has(t)));
+  // Altiseo : toute donnée structurée schema.org compte (Titanor exigeait un type « entreprise locale »).
+  const hasLocal = pages.some((p) => p.ldTypes.length > 0);
   add("local_business", n ? (hasLocal ? 1 : 0) : null, 0, 0);
   const allText = pages.map((p) => p.text).join(" ");
   add("phone", co.phone && n ? (textHasPhone(allText, co.phone) ? 1 : 0) : null, 0, 0, [], co.phone);

@@ -108,3 +108,10 @@ export type Publication = {
 export const MAX_REGENERATIONS = 5;
 export const MAX_INTERNAL_LINKS = 10;
 export const INSTRUCTIONS_MAX = 1000;
+
+export type AuditLevel = "critical" | "warning" | "info";
+export type AuditIssue = { code: string; level: AuditLevel; affected: number; total: number; pages: string[]; detail: string | null };
+export type AuditRun = {
+  id: string; siteId: string; status: "done" | "failed"; pagesCrawled: number; score: number | null;
+  speed: { score: number; lcp_ms: number | null } | null; error: string | null; createdAt: string; issues: AuditIssue[];
+};

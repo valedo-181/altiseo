@@ -278,7 +278,6 @@ export function ServicesFilm() {
                 <li><span className="pill mr-2 bg-warning-soft text-warning">Moyen</span>12 descriptions manquantes</li>
               </ul>
             </div>
-            <p className="mt-3"><span className="pill bg-accent-soft text-accent">Bientôt disponible</span></p>
           </Shot>}>
           <p>La santé technique de votre site, notée sur 100 : titres, descriptions, liens cassés, images, vitesse sur téléphone.</p>
           <p>Chaque problème vient avec les pages concernées et la correction à faire, du plus grave au moins grave.</p>

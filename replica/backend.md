@@ -12,6 +12,7 @@
 | Rédaction | `src/lib/ai/claude.ts` : analyse du site, 30 sujets, articles | écrit, testé avec un faux client (7 tests) ; **pas encore appelé avec une vraie clé** |
 | WordPress | `src/lib/cms/wordpress.ts` : API REST + mot de passe d'application | écrit, testé avec un faux serveur (4 tests) ; à tester sur un vrai site |
 | Chiffrement | `src/lib/crypto.ts` (AES-256-GCM) | testé |
+| Audit SEO | `src/lib/seo/` (lecture du site, 15 contrôles, PageSpeed), `runAudit` | écrit, calcul testé (3 tests) ; lecture d'un vrai site pas encore essayée en ligne |
 | Mots-clés | DataForSEO | à faire |
 | Paiement | Stripe Checkout + portail + webhooks | à faire |
 | E-mails | Resend (article prêt, échec, fin d'essai) | à faire ; les e-mails de connexion partent par Supabase |

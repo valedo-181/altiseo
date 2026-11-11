@@ -4,7 +4,9 @@ import { AiError, analyzeSite, planTopics, writeArticle, type SiteBrief } from "
 import { testWordPress, upsertWordPressPost } from "@/lib/cms/wordpress";
 import { config } from "@/lib/config";
 import { db } from "@/lib/data/store";
-import { safeFetch } from "@/lib/seo/crawl";
+import { scoreSite } from "@/lib/seo/audit";
+import { crawlSite, pageSpeed, safeFetch } from "@/lib/seo/crawl";
+import { toAuditIssues } from "@/lib/seo/report";
 import { htmlToText } from "@/lib/seo/text";
 import { addDays, localDate, publishDates } from "@/lib/domain/dates";
 import { markdownToHtml, wordCount } from "@/lib/domain/markdown";
@@ -279,4 +281,29 @@ export async function publishArticle(workspaceId: string, articleId: string): Pr
   });
   void html;
   return { ok: true, value: { mode: site.publishMode, url, simulated: true } };
+}
+
+/** Délai minimal entre deux audits d'un même site (chaque audit lit jusqu'à 30 pages du site). */
+const AUDIT_COOLDOWN_MS = 2 * 60_000;
+
+/**
+ * F06 : audit technique. Lit le site (30 pages au plus, 30 secondes, adresses publiques seulement,
+ * robots.txt respecté) et mesure la vitesse sur téléphone en parallèle, puis note sur 100.
+ * Un site injoignable donne un audit « échoué » avec la raison, pas une erreur.
+ */
+export async function runAudit(workspaceId: string, siteId: string): Promise<Result<{ score: number | null }>> {
+  const site = await db.getSite(workspaceId, siteId);
+  const last = await db.latestAudit(workspaceId, siteId);
+  if (last?.status === "done" && Date.now() - new Date(last.createdAt).getTime() < AUDIT_COOLDOWN_MS) return fail("Un audit vient d'être fait. Attendez deux minutes avant de le relancer.");
+  const [crawl, speed] = await Promise.all([crawlSite(site.url, { maxPages: 30, budgetMs: 30_000 }), pageSpeed(site.url, 35_000)]);
+  if ("error" in crawl) {
+    await db.saveAudit(workspaceId, siteId, { status: "failed", pagesCrawled: 0, score: null, speed: null, error: crawl.error, issues: [] });
+    return fail(`Le site n'a pas pu être lu : ${crawl.error}.`);
+  }
+  const { score, issues } = scoreSite({ ...crawl, speed }, { name: site.name, phone: null, address: null });
+  await db.saveAudit(workspaceId, siteId, {
+    status: "done", pagesCrawled: crawl.pages.length, score, speed: speed ? { score: speed.score, lcp_ms: speed.lcp_ms } : null, error: null,
+    issues: toAuditIssues(issues),
+  });
+  return { ok: true, value: { score } };
 }

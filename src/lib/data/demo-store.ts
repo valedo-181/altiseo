@@ -2,7 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Article, CalendarItem, Competitor, Integration, Publication, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { Article, AuditRun, CalendarItem, Competitor, Integration, Publication, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 
 /**
  * Couche de données en MODE DÉMO : un fichier JSON local (.data/demo.json), un seul processus.
@@ -24,9 +24,10 @@ type Doc = {
   articles: Article[];
   integrations: Integration[];
   publications: Publication[];
+  audits: AuditRun[];
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
@@ -315,6 +316,25 @@ export const demoDb = {
       if (existing) Object.assign(existing, p);
       else d.publications.push({ ...p, id: randomUUID() });
       return existing ?? d.publications[d.publications.length - 1];
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Audit
+  // -------------------------------------------------------------------------
+
+  async saveAudit(workspaceId: string, siteId: string, run: Omit<AuditRun, "id" | "siteId" | "createdAt">) {
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const a: AuditRun = { ...run, id: randomUUID(), siteId, createdAt: now() };
+      d.audits.push(a);
+      return a;
+    });
+  },
+  async latestAudit(workspaceId: string, siteId: string) {
+    return read((d) => {
+      siteOf(d, siteId, workspaceId);
+      return d.audits.filter((a) => a.siteId === siteId).sort((x, y) => y.createdAt.localeCompare(x.createdAt))[0] ?? null;
     });
   },
 };

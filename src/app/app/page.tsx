@@ -15,7 +15,8 @@ export const metadata: Metadata = { title: "Tableau de bord" };
 /** S11 : tableau de bord. */
 export default async function Dashboard() {
   const { workspace, site, subscription } = await requireSite();
-  const [articles, calendar] = await Promise.all([db.listArticles(workspace.id, site.id), db.listCalendar(workspace.id, site.id)]);
+  const [articles, calendar, audit] = await Promise.all([db.listArticles(workspace.id, site.id), db.listCalendar(workspace.id, site.id), db.latestAudit(workspace.id, site.id)]);
+  const critical = audit?.issues.filter((i) => i.level === "critical").length ?? 0;
   const today = localDate(new Date(), site.timezone);
   const next = calendar.find((c) => c.scheduledFor >= today && (c.status === "approved" || c.status === "proposed"));
   const published = articles.filter((a) => a.status === "published").length;
@@ -37,8 +38,10 @@ export default async function Dashboard() {
           {subscription && <QuotaBar used={subscription.used} total={subscription.articlesPerMonth} />}
         </Card>
         <Card className="flex items-center gap-4">
-          <ScoreGauge value={null} />
-          <div><p className="text-sm text-text-muted">Santé SEO</p><Link href="/app/audit" className="text-sm font-semibold text-accent underline underline-offset-2">Pas encore d'audit</Link></div>
+          <ScoreGauge value={audit?.status === "done" ? audit.score : null} />
+          <div><p className="text-sm text-text-muted">Santé SEO</p><Link href="/app/audit" className="text-sm font-semibold text-accent underline underline-offset-2">
+            {!audit ? "Pas encore d'audit" : audit.status === "failed" ? "Audit à relancer" : critical ? `${critical} problème${critical > 1 ? "s" : ""} critique${critical > 1 ? "s" : ""}` : "Voir l'audit"}
+          </Link></div>
         </Card>
       </div>
 

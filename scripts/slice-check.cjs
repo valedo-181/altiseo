@@ -101,7 +101,7 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   assert(await page.getByText("Image d'exemple :").count() === 1, "l'image d'exemple est annoncée");
   await page.getByRole("button", { name: "Changer l'image" }).click();
   await page.getByText("Image d'exemple ajoutée.").waitFor();
-  assert(await page.getByText(/Encore 3 essais/).count() === 1, "essais restants comptés");
+  assert(await page.getByText(/Encore \d essais?/).count() === 0, "une image d'exemple ne consomme pas d'essai");
   await shot("S14-image");
   await page.getByRole("button", { name: "Retirer l'image" }).click();
   await page.getByText("Cet article n'a pas d'image.").waitFor();

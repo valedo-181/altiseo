@@ -298,7 +298,7 @@ export async function illustrateArticle(workspaceId: string, articleId: string, 
   const site = await db.getSite(workspaceId, a.siteId);
   const alt = imageAlt(a.title);
   if (!config.images) {
-    await db.setArticleImage(workspaceId, a.id, { imageUrl: SAMPLE_IMAGE, imageAlt: alt, imagePrompt: null, imageDemo: true }, true);
+    await db.setArticleImage(workspaceId, a.id, { imageUrl: SAMPLE_IMAGE, imageAlt: alt, imagePrompt: null, imageDemo: true }, false); // une image d'exemple ne consomme pas d'essai
     return { ok: true, value: { demo: true } };
   }
   // Une nouvelle demande repart de la même scène ; Higgsfield en donne une autre vue à chaque fois.

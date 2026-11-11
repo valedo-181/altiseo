@@ -90,7 +90,8 @@
 - [ ] **Brancher Higgsfield (images des articles).** En attente : créer une clé API dans la console Higgsfield,
       recharger le solde API (à part de l'abonnement), mettre `HIGGSFIELD_KEY_ID` et `HIGGSFIELD_KEY_SECRET` dans
       Vercel, redéployer, puis faire un premier essai réel (jamais testé contre la vraie API).
-- [ ] **Activer la publication automatique.** En attente : `CRON_SECRET` dans Vercel, puis redéployer.
+- [ ] **Activer la publication automatique.** `CRON_SECRET` ajouté dans Vercel le 11.11.2026. Reste à vérifier un
+      premier passage réel (Vercel → Settings → Cron Jobs → Run, puis les articles créés dans la base).
 - [ ] **Brancher le vrai Google (Search Console).** En attente. Google Cloud : projet, activer
       « Google Search Console API », écran de consentement OAuth, ID client « Application Web » avec la
       redirection `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback`. Vercel :

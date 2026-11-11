@@ -2,7 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Article, AuditRun, CalendarItem, Competitor, Integration, Publication, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 
 /**
  * Couche de données en MODE DÉMO : un fichier JSON local (.data/demo.json), un seul processus.
@@ -25,9 +25,10 @@ type Doc = {
   integrations: Integration[];
   publications: Publication[];
   audits: AuditRun[];
+  search: Array<SearchConnection & { report: SearchReport | null }>;
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
@@ -335,6 +336,56 @@ export const demoDb = {
     return read((d) => {
       siteOf(d, siteId, workspaceId);
       return d.audits.filter((a) => a.siteId === siteId).sort((x, y) => y.createdAt.localeCompare(x.createdAt))[0] ?? null;
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Mots-clés (Google Search Console)
+  // -------------------------------------------------------------------------
+
+  async searchConnection(workspaceId: string, siteId: string): Promise<SearchConnection | null> {
+    return read((d) => {
+      siteOf(d, siteId, workspaceId);
+      const c = d.search.find((x) => x.siteId === siteId);
+      if (!c) return null;
+      const { report: _r, ...rest } = c;
+      return rest;
+    });
+  },
+  async searchReport(workspaceId: string, siteId: string): Promise<SearchReport | null> {
+    return read((d) => {
+      siteOf(d, siteId, workspaceId);
+      return d.search.find((x) => x.siteId === siteId)?.report ?? null;
+    });
+  },
+  async saveSearchConnection(workspaceId: string, siteId: string, data: { property: string; demo: boolean }, _secret?: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.search = d.search.filter((x) => x.siteId !== siteId);
+      d.search.push({ siteId, property: data.property, demo: data.demo, status: "ok", lastError: null, lastSyncedAt: null, report: null });
+    });
+  },
+  async searchSecret(_workspaceId: string, _siteId: string): Promise<string | null> {
+    return null;
+  },
+  async saveSearchReport(workspaceId: string, siteId: string, report: SearchReport) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const c = d.search.find((x) => x.siteId === siteId);
+      if (c) Object.assign(c, { report, status: "ok", lastError: null, lastSyncedAt: now() });
+    });
+  },
+  async markSearchError(workspaceId: string, siteId: string, error: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const c = d.search.find((x) => x.siteId === siteId);
+      if (c) Object.assign(c, { status: "error", lastError: error });
+    });
+  },
+  async removeSearchConnection(workspaceId: string, siteId: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.search = d.search.filter((x) => x.siteId !== siteId);
     });
   },
 };

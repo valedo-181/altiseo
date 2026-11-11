@@ -294,3 +294,27 @@ export async function startAudit(_s?: FormState, _f?: FormData): Promise<FormSta
   revalidatePath("/app");
   return r.ok ? { ok: `Audit terminé : ${r.value.score} sur 100.` } : { error: r.error };
 }
+
+// ---------------------------------------------------------------------------
+// Mots-clés (Google Search Console)
+// ---------------------------------------------------------------------------
+
+export async function connectSearchDemo(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await svc.connectSearchDemo(workspace.id, site.id);
+  revalidatePath("/app/mots-cles");
+  return r.ok ? { ok: "Chiffres d'exemple chargés." } : { error: r.error };
+}
+
+export async function refreshSearch(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await svc.syncSearch(workspace.id, site.id);
+  revalidatePath("/app/mots-cles");
+  return r.ok ? { ok: "Chiffres mis à jour." } : { error: r.error };
+}
+
+export async function disconnectSearch() {
+  const { workspace, site } = await requireSite();
+  await svc.disconnectSearch(workspace.id, site.id);
+  revalidatePath("/app/mots-cles");
+}

@@ -1,7 +1,7 @@
 import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
-import type { Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
 /**
@@ -315,4 +315,46 @@ export const supabaseDb = {
     }));
     return { id: s(r.id), siteId, status: r.status, pagesCrawled: Number(r.pages_crawled), score: r.score, speed: r.speed, error: r.error, createdAt: s(r.created_at), issues };
   },
+
+  // Mots-clés (Google Search Console) ---------------------------------------
+  // Lecture : client de la personne (la RLS filtre, le jeton n'est pas lisible). Écriture : serveur.
+  async searchConnection(workspaceId: string, siteId: string): Promise<SearchConnection | null> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const r = check(await sb.from("search_connections").select("site_id, property, status, last_error, last_synced_at, demo").eq("site_id", siteId).maybeSingle()) as Row | null;
+    if (!r) return null;
+    return { siteId: s(r.site_id), property: s(r.property), status: r.status === "error" ? "error" : "ok", lastError: (r.last_error as string) ?? null, lastSyncedAt: (r.last_synced_at as string) ?? null, demo: Boolean(r.demo) };
+  },
+  async searchReport(workspaceId: string, siteId: string): Promise<SearchReport | null> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const r = check(await sb.from("search_connections").select("report").eq("site_id", siteId).maybeSingle()) as Row | null;
+    return (r?.report as SearchReport | null) ?? null;
+  },
+  async saveSearchConnection(workspaceId: string, siteId: string, data: { property: string; demo: boolean }, secret?: string) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("search_connections").upsert({
+      site_id: siteId, workspace_id: workspaceId, property: data.property, demo: data.demo, status: "ok", last_error: null, last_synced_at: null,
+      report: null, credentials_enc: secret ? toBytea(encryptSecret(secret)) : null,
+    }, { onConflict: "site_id" }));
+  },
+  /** Jeton Google déchiffré, pour les appels côté serveur. Jamais renvoyé au navigateur. */
+  async searchSecret(workspaceId: string, siteId: string): Promise<string | null> {
+    await siteOf(workspaceId, siteId);
+    const r = check(await adminClient().from("search_connections").select("credentials_enc").eq("site_id", siteId).maybeSingle()) as Row | null;
+    return r?.credentials_enc ? decryptSecret(fromBytea(String(r.credentials_enc))) : null;
+  },
+  async saveSearchReport(workspaceId: string, siteId: string, report: SearchReport) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("search_connections").update({ report, status: "ok", last_error: null, last_synced_at: new Date().toISOString() }).eq("site_id", siteId));
+  },
+  async markSearchError(workspaceId: string, siteId: string, error: string) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("search_connections").update({ status: "error", last_error: error }).eq("site_id", siteId));
+  },
+  async removeSearchConnection(workspaceId: string, siteId: string) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("search_connections").delete().eq("site_id", siteId));
+  },
 };
+

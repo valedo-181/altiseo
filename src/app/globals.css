@@ -83,3 +83,8 @@
 .plan-best { background: linear-gradient(140deg, rgb(var(--c-brand-cyan)), rgb(var(--c-brand-cyan) / 0.15) 45%, rgb(var(--c-highlight) / 0.8)); }
 .pricing-glow { background: radial-gradient(60% 70% at 50% 0%, rgb(var(--c-brand-cyan) / 0.14), transparent 70%); pointer-events: none; }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) { section.plan:hover { transform: translateY(-4px); } }
+
+/* Couleur des courbes (page Mots-clés) : vérifiée contre le fond en clair et en sombre. */
+:root { --c-chart: 11 143 163; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-chart: 53 208 224; } }
+:root[data-theme="dark"], [data-theme="dark"] { --c-chart: 53 208 224; }

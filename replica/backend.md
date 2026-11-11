@@ -96,3 +96,25 @@
 - [ ] Clé Claude (`ANTHROPIC_API_KEY`) et `ENCRYPTION_KEY` dans Vercel.
 - [ ] Domaine définitif à la place de `altiseo-hazel.vercel.app`.
 - [ ] Essayer la console `/admin` sur le vrai site (QR code de double authentification).
+
+
+## Suivi des mots-clés (Google Search Console)
+
+Page `/app/mots-cles` (S24). Source : l'API officielle de Search Console, en lecture seule
+(portée `webmasters.readonly`). Code : `src/lib/search/` (`google.ts`, `report.ts`), service dans
+`src/lib/app/service.ts`, table `search_connections` (migration `20261111000000_search_console.sql`).
+
+- Connexion : `/app/mots-cles/google/connect` → accord chez Google → `/app/mots-cles/google/callback`.
+  Secret à usage unique dans un cookie (anti-CSRF). La propriété Search Console du site est choisie
+  toute seule (domaine entier d'abord) ; aucune propriété correspondante = connexion refusée et accès retiré.
+- Le jeton de renouvellement est chiffré (AES-256-GCM, `ENCRYPTION_KEY`), illisible côté navigateur
+  (droits par colonne, testé dans `replica/tests/search_test.sql`). Déconnexion = accès retiré chez Google + ligne effacée.
+- Rapport : 90 jours de totaux par jour, 28 derniers jours contre les 28 d'avant, 200 recherches au plus.
+  Relu au plus une fois par 24 h à l'ouverture de la page, ou par le bouton « Actualiser ».
+- Sans `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` : chiffres d'exemple, annoncés comme tels.
+
+À faire côté Google Cloud : créer un projet, activer « Google Search Console API », écran de
+consentement OAuth (portée `webmasters.readonly`, portée « sensible » : validation par Google à demander
+avant d'ouvrir au public, sinon écran « application non validée » et 100 comptes de test au plus),
+ID client OAuth « Application Web » avec l'URI `https://<domaine>/app/mots-cles/google/callback`.
+Pas encore testé contre le vrai Google (réseau fermé depuis l'environnement de développement).

@@ -109,6 +109,31 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
     assert(r.status() === 200, `${path} répond`);
     await shot(name);
   }
+  console.log("Mots-clés (chiffres d'exemple)");
+  await page.goto(BASE + "/app/mots-cles");
+  assert(await page.getByText("Connectez Google Search Console").count() === 1, "invitation à connecter Search Console");
+  await page.getByRole("button", { name: "Voir avec des chiffres d'exemple" }).click();
+  await page.getByRole("heading", { name: "Vos mots-clés" }).waitFor();
+  assert(await page.locator("figure svg path[stroke]").count() === 3, "trois courbes");
+  assert(await page.locator("section[aria-labelledby=h-queries] tbody tr").count() > 3, "tableau des recherches rempli");
+  assert(await page.getByText("Chiffres d'exemple :").count() === 1, "les chiffres d'exemple sont annoncés");
+  const chart = page.locator("figure [role=group]").first();
+  await chart.hover({ position: { x: 200, y: 80 } });
+  assert(await chart.locator("[role=status]").innerText().then((t) => /clics?/.test(t)), "survol : valeur du jour");
+  await chart.focus();
+  await page.keyboard.press("ArrowLeft");
+  assert(await chart.locator("[role=status]").count() === 1, "clavier : valeur du jour");
+  await page.getByRole("button", { name: "28 jours" }).click();
+  await page.locator("summary", { hasText: "Chiffres jour par jour" }).click();
+  assert(await page.locator("details tbody tr").count() === 28, "période de 28 jours appliquée");
+  await shot("S24");
+  assert(await page.locator("section[aria-labelledby=h-targets] li").count() >= 1, "mot-clé visé par l'article écrit");
+  await page.getByRole("button", { name: "Déconnecter Google" }).click();
+  await page.getByText("Connectez Google Search Console").waitFor();
+  assert(true, "déconnexion");
+  await page.getByRole("button", { name: "Voir avec des chiffres d'exemple" }).click();
+  await page.getByRole("heading", { name: "Vos mots-clés" }).waitFor();
+
   await page.goto(BASE + "/app/reglages");
   await page.getByLabel("Consignes pour chaque article").fill("Vouvoyer. Citer nos 3 agences.");
   await page.getByRole("button", { name: "Enregistrer" }).first().click();
@@ -133,12 +158,21 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const pm = await mob.newPage();
   pm.on("pageerror", (e) => errors.push("mobile: " + e.message));
-  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages"]) {
+  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles"]) {
     await pm.goto(BASE + path);
     const w = await pm.evaluate(() => document.documentElement.scrollWidth);
     assert(w <= 390, `${path} sans défilement horizontal à 390 px (${w})`);
   }
   if (SHOTS) { await pm.goto(BASE + "/app/calendrier"); await pm.screenshot({ path: `${SHOTS}/S12-mobile.png`, fullPage: true }); }
+  if (SHOTS) {
+    await pm.goto(BASE + "/app/mots-cles"); await pm.screenshot({ path: `${SHOTS}/S24-mobile.png`, fullPage: true });
+    const dark = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2, storageState: await ctx.storageState() });
+    const pd = await dark.newPage();
+    await pd.goto(BASE + "/app/mots-cles");
+    await pd.locator("figure [role=group]").nth(2).hover({ position: { x: 260, y: 90 } });
+    await pd.screenshot({ path: `${SHOTS}/S24-sombre.png` });
+    await dark.close();
+  }
   const kb = await (await browser.newContext()).newPage();
   await kb.goto(BASE + "/connexion");
   await kb.keyboard.press("Tab"); // lien « Aller au contenu » absent ici : logo

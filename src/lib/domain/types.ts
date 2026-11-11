@@ -115,3 +115,35 @@ export type AuditRun = {
   id: string; siteId: string; status: "done" | "failed"; pagesCrawled: number; score: number | null;
   speed: { score: number; lcp_ms: number | null } | null; error: string | null; createdAt: string; issues: AuditIssue[];
 };
+
+/** Connexion d'un site à Google Search Console (le jeton d'accès n'est jamais dans ce type). */
+export type SearchConnection = {
+  siteId: string;
+  property: string; // « sc-domain:exemple.ch » ou « https://exemple.ch/ »
+  status: "ok" | "error";
+  lastError: string | null;
+  lastSyncedAt: string | null;
+  demo: boolean; // chiffres d'exemple (sans compte Google)
+};
+
+export type SearchDay = { day: string; clicks: number; impressions: number; position: number | null };
+export type SearchQuery = {
+  query: string;
+  clicks: number;
+  impressions: number;
+  position: number; // position moyenne sur la période, pondérée par les affichages
+  prevPosition: number | null; // même mesure sur la période d'avant ; null = nouveau
+  prevClicks: number;
+};
+export type SearchTotals = { clicks: number; impressions: number; position: number | null };
+
+/** Ce que la page « Mots-clés » affiche. Refait à chaque synchronisation. */
+export type SearchReport = {
+  from: string; // premier jour du graphique
+  to: string; // dernier jour connu de Google
+  periodDays: number; // longueur de la période comparée (28)
+  days: SearchDay[]; // un point par jour, sans trou
+  current: SearchTotals;
+  previous: SearchTotals;
+  queries: SearchQuery[]; // triées par clics puis affichages
+};

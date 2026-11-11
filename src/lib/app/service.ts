@@ -13,6 +13,8 @@ import { markdownToHtml, wordCount } from "@/lib/domain/markdown";
 import { alternativeDemoTopic, planDemoTopics } from "@/lib/domain/plan";
 import { slugify, uniqueSlug } from "@/lib/domain/slug";
 import { MAX_REGENERATIONS, type Site } from "@/lib/domain/types";
+import { dailyQueries, dailyTotals, exchangeCode, listProperties, refreshAccess, revokeToken } from "@/lib/search/google";
+import { buildReport, CHART_DAYS, matchProperty, PERIOD_DAYS, sampleRows } from "@/lib/search/report";
 import { guessLanguage, normalizeSiteUrl, siteNameFromHost } from "@/lib/domain/url";
 import { writeDemoArticle } from "@/lib/domain/write";
 
@@ -306,4 +308,76 @@ export async function runAudit(workspaceId: string, siteId: string): Promise<Res
     issues: toAuditIssues(issues),
   });
   return { ok: true, value: { score } };
+}
+
+// ---------------------------------------------------------------------------
+// Mots-clés (Google Search Console)
+// ---------------------------------------------------------------------------
+
+const google = () => ({ clientId: process.env.GOOGLE_CLIENT_ID!.trim(), clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim() });
+const SEARCH_COOLDOWN_MS = 60_000;
+
+/** Sans identifiants Google : connexion d'exemple, avec des chiffres fabriqués à partir des sujets du calendrier. */
+export async function connectSearchDemo(workspaceId: string, siteId: string): Promise<Result> {
+  if (config.search) return fail("Connectez votre compte Google.");
+  const site = await db.getSite(workspaceId, siteId);
+  await db.saveSearchConnection(workspaceId, siteId, { property: `sc-domain:${new URL(site.url).hostname.replace(/^www\./, "")}`, demo: true });
+  return syncSearch(workspaceId, siteId, { force: true });
+}
+
+/** Retour de Google : échange le code, trouve la propriété Search Console du site, garde le jeton chiffré, puis lit les chiffres. */
+export async function finishGoogleConnect(workspaceId: string, siteId: string, code: string, redirectUri: string): Promise<Result> {
+  if (!config.search) return fail("La connexion à Google n'est pas configurée.");
+  const site = await db.getSite(workspaceId, siteId);
+  const tokens = await exchangeCode(google(), code, redirectUri);
+  if (!tokens.ok) return fail(tokens.error);
+  const props = await listProperties(tokens.value.access);
+  if (!props.ok) { await revokeToken(tokens.value.refresh); return fail(props.error); }
+  const property = matchProperty(site.url, props.value);
+  if (!property) {
+    await revokeToken(tokens.value.refresh);
+    return fail(`Ce compte Google n'a pas ${new URL(site.url).hostname} dans Search Console. Ajoutez et validez le site dans Search Console, ou connectez le compte Google qui le gère.`);
+  }
+  await db.saveSearchConnection(workspaceId, siteId, { property, demo: false }, tokens.value.refresh);
+  return syncSearch(workspaceId, siteId, { force: true });
+}
+
+/** Relit les 90 derniers jours chez Google et refait le rapport. Une erreur est gardée sur la connexion, pas levée. */
+export async function syncSearch(workspaceId: string, siteId: string, opts: { force?: boolean } = {}): Promise<Result> {
+  const conn = await db.searchConnection(workspaceId, siteId);
+  if (!conn) return fail("Search Console n'est pas connecté.");
+  if (!opts.force && conn.lastSyncedAt && Date.now() - new Date(conn.lastSyncedAt).getTime() < SEARCH_COOLDOWN_MS) return fail("Les chiffres viennent d'être mis à jour. Google ne les actualise qu'une fois par jour.");
+  const today = localDate(new Date(), "UTC");
+  if (conn.demo) {
+    const site = await db.getSite(workspaceId, siteId);
+    const keywords = (await db.listCalendar(workspaceId, siteId)).map((c) => c.keyword);
+    const rows = sampleRows(site.id, keywords.length ? keywords : [site.theme || site.name], today);
+    await db.saveSearchReport(workspaceId, siteId, buildReport(rows.days, rows.queries, today));
+    return { ok: true, value: undefined };
+  }
+  if (!config.search) return fail("La connexion à Google n'est pas configurée.");
+  const refresh = await db.searchSecret(workspaceId, siteId);
+  if (!refresh) { await db.markSearchError(workspaceId, siteId, "Reconnectez votre compte Google."); return fail("Reconnectez votre compte Google."); }
+  const access = await refreshAccess(google(), refresh);
+  if (!access.ok) { await db.markSearchError(workspaceId, siteId, access.error); return fail(access.error); }
+  const to = addDays(today, -1);
+  const [days, queries] = await Promise.all([
+    dailyTotals(access.value, conn.property, addDays(to, -(CHART_DAYS + 3)), to),
+    dailyQueries(access.value, conn.property, addDays(to, -(PERIOD_DAYS * 2 + 3)), to),
+  ]);
+  const bad = !days.ok ? days : !queries.ok ? queries : null;
+  if (bad || !days.ok || !queries.ok) { await db.markSearchError(workspaceId, siteId, bad!.error); return fail(bad!.error); }
+  await db.saveSearchReport(workspaceId, siteId, buildReport(days.value, queries.value, today));
+  return { ok: true, value: undefined };
+}
+
+/** Déconnexion : l'accès est retiré chez Google, puis le jeton et les chiffres sont effacés chez nous. */
+export async function disconnectSearch(workspaceId: string, siteId: string): Promise<void> {
+  const conn = await db.searchConnection(workspaceId, siteId);
+  if (!conn) return;
+  if (!conn.demo && config.search) {
+    const refresh = await db.searchSecret(workspaceId, siteId).catch(() => null);
+    if (refresh) await revokeToken(refresh);
+  }
+  await db.removeSearchConnection(workspaceId, siteId);
 }

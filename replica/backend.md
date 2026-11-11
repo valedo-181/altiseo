@@ -82,3 +82,16 @@
 - Supabase : Authentication → Sign In / Providers → Multi-Factor → TOTP doit être activé.
 - Testé : 6 vérifications SQL (`replica/tests/admin_test.sql`), 5 tests des calculs. Les écrans n'ont pas
   encore été essayés sur le vrai projet (il faut un compte admin connecté).
+
+## À faire
+
+- [ ] **Resend (e-mails).** En attente du choix de l'adresse d'expédition : `titanor.app` (déjà vérifié,
+      provisoire), `domevia.ch` ou un domaine Altiseo (3 lignes DNS à poser). Ensuite :
+      1. Supabase → Authentication → Emails → SMTP Settings : hôte `smtp.resend.com`, port 465,
+         utilisateur `resend`, mot de passe = une clé API Resend. Lève la limite de 2 e-mails par heure
+         du service intégré, qui bloque les connexions dès le troisième essai.
+      2. `RESEND_API_KEY` et `MAIL_FROM` dans Vercel, puis les e-mails de l'app : article prêt à relire,
+         échec d'envoi au site, fin d'essai.
+- [ ] Clé Claude (`ANTHROPIC_API_KEY`) et `ENCRYPTION_KEY` dans Vercel.
+- [ ] Domaine définitif à la place de `altiseo-hazel.vercel.app`.
+- [ ] Essayer la console `/admin` sur le vrai site (QR code de double authentification).

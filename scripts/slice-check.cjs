@@ -95,6 +95,20 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   await page.getByText("Envoyé en brouillon sur WordPress (simulation).").waitFor();
   assert(await page.getByText(/Envoyé à WordPress le/).count() === 1, "publication enregistrée");
 
+  console.log("Image de l'article");
+  await page.goto(articleUrl);
+  assert(await page.locator("section[aria-labelledby=h-image] img").count() === 1, "l'article a reçu une image");
+  assert(await page.getByText("Image d'exemple :").count() === 1, "l'image d'exemple est annoncée");
+  await page.getByRole("button", { name: "Changer l'image" }).click();
+  await page.getByText("Image d'exemple ajoutée.").waitFor();
+  assert(await page.getByText(/Encore 3 essais/).count() === 1, "essais restants comptés");
+  await shot("S14-image");
+  await page.getByRole("button", { name: "Retirer l'image" }).click();
+  await page.getByText("Cet article n'a pas d'image.").waitFor();
+  await page.getByRole("button", { name: "Créer une image" }).click();
+  await page.locator("section[aria-labelledby=h-image] img").waitFor();
+  assert(true, "retirer puis recréer l'image");
+
   console.log("Listes, tableau de bord, autres écrans");
   await page.goto(BASE + "/app/articles");
   assert(await page.locator("tbody tr").count() === 1, "1 article dans la liste");

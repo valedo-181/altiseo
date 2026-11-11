@@ -24,6 +24,10 @@ export function WritingForm({ site }: { site: Site }) {
         <input type="checkbox" name="mentionCompetitors" defaultChecked={site.mentionCompetitors} className="mt-1 size-4 accent-[rgb(var(--c-accent))]" />
         <span><span className="block text-sm font-semibold">Citer les concurrents quand c'est utile</span><span className="block text-xs text-text-muted">Dans les comparatifs et les listes seulement.</span></span>
       </label>
+      <label className="flex items-start gap-3">
+        <input type="checkbox" name="featuredImages" defaultChecked={site.featuredImages} className="mt-1 size-4 accent-[rgb(var(--c-accent))]" />
+        <span><span className="block text-sm font-semibold">Créer une image pour chaque article</span><span className="block text-xs text-text-muted">Une photo réaliste, sans texte ni visage reconnaissable. Elle devient l'image mise en avant dans WordPress.</span></span>
+      </label>
       <Submit>Enregistrer</Submit>
     </ActionForm>
   );

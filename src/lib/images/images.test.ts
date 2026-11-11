@@ -1,0 +1,62 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { buildImagePrompt, imageAlt, isOwnImage, IMAGE_STYLE } from "./prompt.ts";
+import { findImageUrl, generateImage } from "./higgsfield.ts";
+
+test("la demande d'image impose la photo réaliste, sans texte ni visage", () => {
+  const p = buildImagePrompt({ idea: "Stacked moving boxes in a bright empty living room.", title: "T", theme: "déménagement" });
+  assert.ok(p.startsWith("Stacked moving boxes in a bright empty living room. Realistic editorial photograph"));
+  assert.ok(p.endsWith(IMAGE_STYLE));
+  const q = buildImagePrompt({ title: "Garde-meubles : <b>quelle</b> taille ?", theme: "déménagement", keyword: "garde-meubles" });
+  assert.match(q, /A scene illustrating "Garde-meubles : b quelle \/b taille \?", in the field of déménagement \(garde-meubles\)\./);
+  assert.equal(imageAlt("  Déménager\nen hiver  "), "Déménager en hiver");
+});
+
+test("seules les images de notre stockage partent vers le site du client", () => {
+  const base = "https://abc.supabase.co";
+  assert.ok(isOwnImage("https://abc.supabase.co/storage/v1/object/public/article-images/w/a.jpg", base));
+  assert.ok(!isOwnImage("https://evil.example/storage/v1/object/public/article-images/w/a.jpg", base));
+  assert.ok(!isOwnImage("https://abc.supabase.co/storage/v1/object/public/autre/a.jpg", base));
+  assert.ok(!isOwnImage("http://abc.supabase.co/storage/v1/object/public/article-images/a.jpg", base));
+  assert.ok(!isOwnImage("/brand/sommet.jpg", base));
+  assert.ok(!isOwnImage(null, base));
+});
+
+test("lecture tolérante de la réponse", () => {
+  assert.equal(findImageUrl({ status_url: "https://api.higgsfield.ai/requests/1/status", images: [{ url: "https://cdn.test/a.png" }] }), "https://cdn.test/a.png");
+  assert.equal(findImageUrl({ result: { image: { url: "https://cdn.test/x?sig=1" } }, cancel_url: "https://api.higgsfield.ai/c" }), "https://cdn.test/x?sig=1");
+  assert.equal(findImageUrl({ status: "queued", status_url: "https://api.higgsfield.ai/s" }), null);
+});
+
+const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const key = { keyId: "id", keySecret: "tres-secret", pollMs: 1 };
+
+test("dépôt, suivi puis téléchargement de l'image", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  let polls = 0;
+  const r = await generateImage("a photo", { ...key, fetcher: async (url, init) => {
+    calls.push({ url, init });
+    if (url === "https://api.higgsfield.ai/z-image/turbo") return json(200, { request_id: "req_123456", status: "queued", status_url: "https://api.higgsfield.ai/requests/req_123456/status" });
+    if (url.endsWith("/status")) return json(200, ++polls < 2 ? { status: "in_progress" } : { status: "completed", images: [{ url: "https://cdn.test/out.png" }] });
+    return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "content-type": "image/png" } });
+  } });
+  assert.ok(r.ok && r.contentType === "image/png" && r.bytes.length === 3);
+  assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Key id:tres-secret");
+  assert.deepEqual(JSON.parse(String(calls[0].init.body)), { prompt: "a photo", aspect_ratio: "16:9", resolution: "1k" });
+  assert.equal((calls.at(-1)!.init.headers as Record<string, string> | undefined)?.Authorization, undefined, "la clé ne part pas vers le serveur de fichiers");
+});
+
+test("refus, filtre de contenu, fichier qui n'est pas une image : erreurs lisibles, sans la clé", async () => {
+  const bad = await generateImage("p", { ...key, fetcher: async () => json(401, { error: "tres-secret" }) });
+  assert.ok(!bad.ok && !bad.error.includes("tres-secret"));
+  const nsfw = await generateImage("p", { ...key, fetcher: async () => json(200, { request_id: "req_123456", status: "nsfw" }) });
+  assert.ok(!nsfw.ok && /filtre/.test(nsfw.error));
+  const html = await generateImage("p", { ...key, fetcher: async (url) => (url.includes("api.higgsfield.ai") ? json(200, { status: "completed", images: [{ url: "https://cdn.test/a.png" }] }) : new Response("<html>", { status: 200, headers: { "content-type": "text/html" } })) });
+  assert.ok(!html.ok && /pas une image/.test(html.error));
+  const internal = await generateImage("p", { ...key, isPublic: async () => false, fetcher: async () => json(200, { status: "completed", images: [{ url: "https://169.254.169.254/a.png" }] }) });
+  assert.ok(!internal.ok);
+  const foreign = await generateImage("p", { ...key, fetcher: async (url) => (url.endsWith("turbo") ? json(200, { request_id: "../../x", status: "queued", status_url: "https://evil.example/s" }) : json(500, {})) });
+  assert.ok(!foreign.ok && /suivi/.test(foreign.error), "un lien de suivi hors de Higgsfield n'est pas suivi");
+  const model = await generateImage("p", { ...key, model: "https://evil.example", fetcher: async () => json(200, {}) });
+  assert.ok(!model.ok);
+});

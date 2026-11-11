@@ -1,18 +1,21 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { AiError, analyzeSite, planTopics, writeArticle, type SiteBrief } from "@/lib/ai/claude";
-import { testWordPress, upsertWordPressPost } from "@/lib/cms/wordpress";
+import { testWordPress, uploadWordPressMedia, upsertWordPressPost } from "@/lib/cms/wordpress";
 import { config } from "@/lib/config";
 import { db } from "@/lib/data/store";
 import { scoreSite } from "@/lib/seo/audit";
-import { crawlSite, pageSpeed, safeFetch } from "@/lib/seo/crawl";
+import { crawlSite, pageSpeed, publicUrl, safeFetch } from "@/lib/seo/crawl";
 import { toAuditIssues } from "@/lib/seo/report";
 import { htmlToText } from "@/lib/seo/text";
 import { addDays, localDate, publishDates } from "@/lib/domain/dates";
 import { markdownToHtml, wordCount } from "@/lib/domain/markdown";
 import { alternativeDemoTopic, planDemoTopics } from "@/lib/domain/plan";
 import { slugify, uniqueSlug } from "@/lib/domain/slug";
-import { MAX_REGENERATIONS, type Site } from "@/lib/domain/types";
+import { MAX_REGENERATIONS, type Article, type Site } from "@/lib/domain/types";
+import { generateImage } from "@/lib/images/higgsfield";
+import { buildImagePrompt, imageAlt, isOwnImage, MAX_IMAGE_GENERATIONS } from "@/lib/images/prompt";
+import { supabaseUrl } from "@/lib/supabase/url";
 import { dailyQueries, dailyTotals, exchangeCode, listProperties, refreshAccess, revokeToken } from "@/lib/search/google";
 import { buildReport, CHART_DAYS, matchProperty, PERIOD_DAYS, sampleRows } from "@/lib/search/report";
 import { guessLanguage, normalizeSiteUrl, siteNameFromHost } from "@/lib/domain/url";
@@ -67,7 +70,7 @@ export async function createSiteFromUrl(workspaceId: string, raw: string): Promi
     targetAudience: found?.targetAudience ?? "",
     tone: found?.tone || "Clair et professionnel, vouvoiement",
     customInstructions: "",
-    mentionCompetitors: false,
+    mentionCompetitors: false, featuredImages: true,
     publishTime: "08:00",
     timezone: "Europe/Zurich",
     publishDays: [1, 2, 3, 4, 5, 6, 7],
@@ -180,7 +183,10 @@ export async function writeArticleForTopic(workspaceId: string, itemId: string):
       siteId: site.id, calendarItemId: item.id, title: w.title, slug, metaTitle: w.metaTitle, metaDescription: w.metaDescription,
       bodyMd: w.bodyMd, language: site.language, keywords: w.keywords, internalLinks: w.internalLinks, wordCount: w.wordCount,
       status: "draft", demo: !config.ai, publishedAt: null, editedAt: null,
+      imageUrl: null, imageAlt: "", imagePrompt: null, imageDemo: false, imageGenerations: 0,
     }, cost);
+    // L'image vient après : si elle échoue, l'article est quand même là (bouton « Créer une image »).
+    if (site.featuredImages) await illustrateArticle(workspaceId, a.id, { idea: w.imageIdea }).catch((e) => console.error("image.article", e instanceof Error ? e.message : e));
     return { ok: true, value: a.id };
   } catch (e) {
     return fail((e as Error).message);
@@ -245,7 +251,58 @@ export async function connectWordPress(workspaceId: string, siteId: string, f: {
 }
 
 /** F04 : envoie l'article au CMS (création, puis mise à jour du même billet). En démo : simulé. */
-export async function publishArticle(workspaceId: string, articleId: string): Promise<Result<{ mode: "draft" | "publish"; url: string; simulated: boolean }>> {
+/** Image d'exemple quand la clé Higgsfield n'est pas là : jamais envoyée au site du client. */
+const SAMPLE_IMAGE = "/brand/sommet.jpg";
+
+/**
+ * Crée l'image d'illustration d'un article (photo réaliste, 16:9) et la range dans notre stockage.
+ * `manual` : demandé par la personne (« Changer l'image »), limité à MAX_IMAGE_GENERATIONS par article.
+ */
+export async function illustrateArticle(workspaceId: string, articleId: string, opts: { idea?: string; manual?: boolean } = {}): Promise<Result<{ demo: boolean }>> {
+  const a = await db.getArticle(workspaceId, articleId);
+  if (!a) return fail("Article introuvable.");
+  if (opts.manual && a.imageGenerations >= MAX_IMAGE_GENERATIONS) return fail(`Vous avez déjà créé ${MAX_IMAGE_GENERATIONS} images pour cet article.`);
+  const site = await db.getSite(workspaceId, a.siteId);
+  const alt = imageAlt(a.title);
+  if (!config.images) {
+    await db.setArticleImage(workspaceId, a.id, { imageUrl: SAMPLE_IMAGE, imageAlt: alt, imagePrompt: null, imageDemo: true }, true);
+    return { ok: true, value: { demo: true } };
+  }
+  // Une nouvelle demande repart de la même scène ; Higgsfield en donne une autre vue à chaque fois.
+  const prompt = a.imagePrompt && !opts.idea ? a.imagePrompt : buildImagePrompt({ idea: opts.idea, title: a.title, theme: site.theme, keyword: a.keywords[0] });
+  const img = await generateImage(prompt, {
+    keyId: process.env.HIGGSFIELD_KEY_ID!.trim(), keySecret: process.env.HIGGSFIELD_KEY_SECRET!.trim(),
+    model: process.env.HIGGSFIELD_IMAGE_MODEL?.trim(), resolution: process.env.HIGGSFIELD_IMAGE_RESOLUTION?.trim(),
+    isPublic: async (u) => Boolean(await publicUrl(u)),
+  });
+  if (!img.ok) return fail(img.error);
+  const url = await db.storeArticleImage(workspaceId, a.id, img.bytes, img.contentType);
+  await db.setArticleImage(workspaceId, a.id, { imageUrl: url, imageAlt: alt, imagePrompt: prompt, imageDemo: false }, true);
+  return { ok: true, value: { demo: false } };
+}
+
+export async function removeArticleImage(workspaceId: string, articleId: string): Promise<Result> {
+  const a = await db.getArticle(workspaceId, articleId);
+  if (!a) return fail("Article introuvable.");
+  await db.setArticleImage(workspaceId, a.id, { imageUrl: null, imageAlt: "", imagePrompt: a.imagePrompt, imageDemo: false }, false);
+  return { ok: true, value: undefined };
+}
+
+/** Lit une image de notre propre stockage (jamais une autre adresse) pour l'envoyer au CMS. */
+async function ownImageBytes(a: Article): Promise<{ bytes: Uint8Array; contentType: "image/jpeg" | "image/png" | "image/webp" } | null> {
+  if (a.imageDemo || !isOwnImage(a.imageUrl, supabaseUrl() ?? null)) return null;
+  try {
+    const r = await fetch(a.imageUrl, { signal: AbortSignal.timeout(20_000), redirect: "error" });
+    const type = (r.headers.get("content-type") ?? "").split(";")[0].trim();
+    if (!r.ok || (type !== "image/jpeg" && type !== "image/png" && type !== "image/webp")) return null;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    return bytes.length && bytes.length <= 10 * 1024 * 1024 ? { bytes, contentType: type } : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function publishArticle(workspaceId: string, articleId: string): Promise<Result<{ mode: "draft" | "publish"; url: string; simulated: boolean; imageMissing?: boolean }>> {
   const a = await db.getArticle(workspaceId, articleId);
   if (!a) return fail("Article introuvable.");
   const site = await db.getSite(workspaceId, a.siteId);
@@ -256,22 +313,34 @@ export async function publishArticle(workspaceId: string, articleId: string): Pr
   if (!integ.demo && config.cms) {
     const secret = await db.integrationSecret(workspaceId, integ.id);
     if (!secret || !integ.config.endpoint || !integ.config.username) return fail("Reconnectez WordPress (identifiants manquants).");
-    const r = await upsertWordPressPost(
-      { endpoint: integ.config.endpoint, username: integ.config.username, appPassword: secret },
-      { title: a.title, html, slug: a.slug, excerpt: a.metaDescription, status: site.publishMode },
-      prev?.remoteId ?? null,
-    );
+    const creds = { endpoint: integ.config.endpoint, username: integ.config.username, appPassword: secret };
+    // Image mise en avant : envoyée une fois, renvoyée seulement si elle a changé, retirée si l'article n'en a plus.
+    let media = { id: prev?.remoteMediaId ?? null, src: prev?.remoteMediaSrc ?? null };
+    let featuredMedia: number | undefined;
+    let imageMissing = false;
+    if (!a.imageUrl || a.imageDemo) {
+      if (media.id) featuredMedia = 0;
+      media = { id: null, src: null };
+    } else if (media.id && media.src === a.imageUrl && /^\d+$/.test(media.id)) {
+      featuredMedia = Number(media.id);
+    } else {
+      const file = await ownImageBytes(a);
+      const up = file ? await uploadWordPressMedia(creds, { ...file, filename: `${a.slug}.${file.contentType === "image/png" ? "png" : file.contentType === "image/webp" ? "webp" : "jpg"}`, alt: a.imageAlt }) : null;
+      if (up?.ok) { featuredMedia = up.value.id; media = { id: String(up.value.id), src: a.imageUrl }; }
+      else imageMissing = true; // l'article part quand même, sans son image
+    }
+    const r = await upsertWordPressPost(creds, { title: a.title, html, slug: a.slug, excerpt: a.metaDescription, status: site.publishMode, featuredMedia }, prev?.remoteId ?? null);
     const at = new Date().toISOString();
     if (!r.ok) {
-      await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: prev?.remoteId ?? null, remoteUrl: prev?.remoteUrl ?? null, status: "error", error: r.error, lastAttemptAt: at });
+      await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: prev?.remoteId ?? null, remoteUrl: prev?.remoteUrl ?? null, remoteMediaId: media.id, remoteMediaSrc: media.src, status: "error", error: r.error, lastAttemptAt: at });
       return fail(r.error);
     }
-    await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: r.value.id, remoteUrl: r.value.url, status: "ok", error: null, lastAttemptAt: at });
+    await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: r.value.id, remoteUrl: r.value.url, remoteMediaId: media.id, remoteMediaSrc: media.src, status: "ok", error: null, lastAttemptAt: at });
     await db.updateArticle(workspaceId, a.id, {
       status: site.publishMode === "publish" ? "published" : "draft",
       publishedAt: site.publishMode === "publish" ? (a.publishedAt ?? at) : a.publishedAt,
     });
-    return { ok: true, value: { mode: site.publishMode, url: r.value.url, simulated: false } };
+    return { ok: true, value: { mode: site.publishMode, url: r.value.url, simulated: false, imageMissing } };
   }
   const remoteId = prev?.remoteId ?? `demo-${createHash("sha256").update(a.id).digest("hex").slice(0, 6)}`;
   const base = integ.config.endpoint ?? site.url;

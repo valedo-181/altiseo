@@ -23,6 +23,8 @@ export type WrittenArticle = {
   keywords: string[];
   internalLinks: InternalLink[];
   wordCount: number;
+  /** Scène à photographier pour illustrer l'article (en anglais), si la rédaction en propose une. */
+  imageIdea?: string;
 };
 
 export function clip(s: string, max: number): string {

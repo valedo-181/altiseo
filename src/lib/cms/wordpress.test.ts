@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testWordPress, upsertWordPressPost } from "./wordpress.ts";
+import { testWordPress, uploadWordPressMedia, upsertWordPressPost } from "./wordpress.ts";
 
 const creds = { endpoint: "https://8.8.8.8", username: "alice", appPassword: "abcd efgh ijkl mnop qrst uvwx" };
 const res = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -46,4 +46,29 @@ test("publication : création, puis mise à jour du même billet ; billet suppri
   assert.ok(again.ok && again.value.url === "https://8.8.8.8/mon-article/");
   assert.match(calls[1].url, /\/posts\/42$/);
   assert.match(calls[2].url, /\/posts$/);
+});
+
+test("image mise en avant : dépôt dans la médiathèque, texte de remplacement, puis rattachement au billet", async () => {
+  const seen: any[] = [];
+  const up = await uploadWordPressMedia(creds, { bytes: new Uint8Array([1, 2, 3]), contentType: "image/jpeg", filename: "Déménager en hiver !.jpg", alt: "Déménager en hiver" }, async (url, init) => {
+    seen.push({ url, init });
+    return res(url.endsWith("/media") ? 201 : 200, { id: 77 });
+  });
+  assert.deepEqual(up, { ok: true, value: { id: 77 } });
+  assert.equal(seen[0].url, "https://8.8.8.8/wp-json/wp/v2/media");
+  assert.equal(seen[0].init.headers["Content-Type"], "image/jpeg");
+  assert.equal(seen[0].init.headers["Content-Disposition"], 'attachment; filename="d-m-nager-en-hiver-.jpg"');
+  assert.ok(seen[0].init.body instanceof Uint8Array);
+  assert.equal(seen[1].url, "https://8.8.8.8/wp-json/wp/v2/media/77");
+  assert.deepEqual(JSON.parse(seen[1].init.body), { alt_text: "Déménager en hiver" });
+
+  const bodies: any[] = [];
+  const post = { title: "T", html: "<p>x</p>", slug: "t", excerpt: "e", status: "draft" as const };
+  await upsertWordPressPost(creds, { ...post, featuredMedia: 77 }, null, async (_u, init) => { bodies.push(JSON.parse(String(init.body))); return res(201, { id: 5 }); });
+  await upsertWordPressPost(creds, post, "5", async (_u, init) => { bodies.push(JSON.parse(String(init.body))); return res(200, { id: 5 }); });
+  assert.equal(bodies[0].featured_media, 77);
+  assert.ok(!("featured_media" in bodies[1]), "sans image précisée, on ne touche pas à celle du billet");
+
+  const denied = await uploadWordPressMedia(creds, { bytes: new Uint8Array([1]), contentType: "image/png", filename: "a.png", alt: "" }, async () => res(403, { code: "rest_cannot_create" }));
+  assert.ok(!denied.ok && /images/.test(denied.error));
 });

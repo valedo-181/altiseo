@@ -394,6 +394,17 @@ export const demoDb = {
   // Publication automatique (tâche de fond)
   // -------------------------------------------------------------------------
 
+  async storeArticleImage(_workspaceId: string, _articleId: string, _bytes: Uint8Array, _contentType: "image/jpeg" | "image/png" | "image/webp"): Promise<string> {
+    throw new Error("Le mode démo ne garde pas d'images : il utilise une image d'exemple.");
+  },
+  async setArticleImage(workspaceId: string, articleId: string, img: { imageUrl: string | null; imageAlt: string; imagePrompt: string | null; imageDemo: boolean }, countGeneration: boolean) {
+    await write((d) => {
+      const a = d.articles.find((x) => x.id === articleId);
+      if (!a) throw new AccessDenied();
+      siteOf(d, a.siteId, workspaceId);
+      Object.assign(a, img, { imageGenerations: (a.imageGenerations ?? 0) + (countGeneration ? 1 : 0), updatedAt: now() });
+    });
+  },
   async automationDue(): Promise<DueTopic[]> {
     return read((d) => {
       const out: DueTopic[] = [];

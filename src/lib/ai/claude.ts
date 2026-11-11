@@ -152,6 +152,7 @@ const ArticleSchema = z.object({
   bodyMarkdown: z.string().describe("Corps de l'article SANS le titre H1, dans la syntaxe décrite"),
   keywords: z.array(z.string()).describe("Mot-clé principal puis 2 à 4 variantes, en minuscules"),
   internalLinks: z.array(z.object({ url: z.string(), anchor: z.string() })).describe("Liens internes utilisés dans le texte, copiés de la liste fournie"),
+  imageIdea: z.string().describe("En anglais, une phrase : la scène ou l'objet concret qu'une photo réaliste montrerait pour illustrer l'article. Sans texte visible, sans logo ni marque, sans personne reconnaissable (de dos, de loin ou les mains seulement)."),
 });
 
 export type ArticleInput = { site: SiteBrief; title: string; angle: string; keyword: string; pages: Array<{ title: string; url: string }> };
@@ -203,6 +204,7 @@ Mot-clé principal : ${input.keyword}`, Math.min(32000, Math.max(8000, input.sit
       keywords: [...new Set([input.keyword, ...out.keywords.map((k) => k.trim().toLowerCase())].filter(Boolean))].slice(0, 5),
       internalLinks,
       wordCount: wordCount(bodyMd),
+      imageIdea: clip(String(out.imageIdea ?? "").trim(), 400),
     },
     usage,
   };

@@ -6,7 +6,9 @@ import { Banner } from "@/components/ui/feedback";
 import { StatusPill } from "@/components/ui/status";
 import { requireSite } from "@/lib/app/context";
 import { db } from "@/lib/data/store";
+import { MAX_IMAGE_GENERATIONS } from "@/lib/images/prompt";
 import { ArticleEditor } from "./editor";
+import { ArticleImage } from "./image";
 
 /** Rédaction et analyse par l'IA : jusqu'à quelques minutes (Vercel Pro). */
 export const maxDuration = 300;
@@ -37,6 +39,7 @@ export default async function ArticlePage({ params, searchParams }: { params: Pr
       </div>
       {ecrit && <Banner tone="success">L'article est écrit. Relisez-le, corrigez si besoin, puis envoyez-le à WordPress.</Banner>}
       {article.demo && <Banner tone="warning">Texte d'exemple (mode démo, sans IA) : la vraie rédaction tiendra compte de votre activité, de vos consignes et des recherches de vos clients.</Banner>}
+      <ArticleImage id={article.id} url={article.imageUrl} alt={article.imageAlt} demo={article.imageDemo} left={Math.max(0, MAX_IMAGE_GENERATIONS - (article.imageGenerations ?? 0))} />
       <ArticleEditor article={article} siteUrl={site.url} canPublish={!!wp} publishMode={site.publishMode} />
     </>
   );

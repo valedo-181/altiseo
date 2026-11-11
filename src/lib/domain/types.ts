@@ -35,6 +35,7 @@ export type Site = {
   tone: string;
   customInstructions: string;
   mentionCompetitors: boolean;
+  featuredImages: boolean; // créer une image d'illustration pour chaque article
   publishTime: string; // « 08:00 », heure locale
   timezone: string; // « Europe/Zurich »
   publishDays: number[]; // ISO : 1 = lundi … 7 = dimanche
@@ -77,6 +78,11 @@ export type Article = {
   wordCount: number;
   status: ArticleStatus;
   demo: boolean; // texte d'exemple (mode démo, sans IA)
+  imageUrl: string | null; // image d'illustration (photo créée par IA) ; null = aucune
+  imageAlt: string;
+  imagePrompt: string | null;
+  imageDemo: boolean; // image d'exemple (sans clé Higgsfield)
+  imageGenerations: number;
   publishedAt: string | null;
   editedAt: string | null;
   createdAt: string;
@@ -100,6 +106,8 @@ export type Publication = {
   integrationId: string;
   remoteId: string | null;
   remoteUrl: string | null;
+  remoteMediaId?: string | null; // image déjà envoyée au CMS…
+  remoteMediaSrc?: string | null; // … et l'adresse dont elle vient
   status: "pending" | "ok" | "error";
   error: string | null;
   lastAttemptAt: string;

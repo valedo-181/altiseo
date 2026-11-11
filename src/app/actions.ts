@@ -241,7 +241,8 @@ export async function publishArticle(_: FormState, f: FormData): Promise<FormSta
   revalidatePath("/app");
   if (!r.ok) return { error: r.error };
   const sim = r.value.simulated ? " (simulation)" : "";
-  return { ok: r.value.mode === "draft" ? `Envoyé en brouillon sur WordPress${sim}.` : `Publié sur WordPress${sim}.` };
+  const img = r.value.imageMissing ? " L'image n'a pas pu être envoyée : l'article est parti sans elle." : "";
+  return { ok: (r.value.mode === "draft" ? `Envoyé en brouillon sur WordPress${sim}.` : `Publié sur WordPress${sim}.`) + img };
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +270,7 @@ export async function saveWriting(_: FormState, f: FormData): Promise<FormState>
   if ([...customInstructions].length > INSTRUCTIONS_MAX) return { error: `Les consignes dépassent ${INSTRUCTIONS_MAX} caractères.` };
   if (tone.length > 200) return { error: "Le ton doit tenir en 200 caractères." };
   if (!Number.isInteger(targetWords) || targetWords < 600 || targetWords > 5000) return { error: "Longueur entre 600 et 5000 mots." };
-  await db.updateSite(workspace.id, site.id, { customInstructions: customInstructions.trim(), tone, targetWords, mentionCompetitors: f.get("mentionCompetitors") === "on" });
+  await db.updateSite(workspace.id, site.id, { customInstructions: customInstructions.trim(), tone, targetWords, mentionCompetitors: f.get("mentionCompetitors") === "on", featuredImages: f.get("featuredImages") === "on" });
   revalidatePath("/app/reglages");
   return { ok: "Réglages enregistrés. Ils s'appliquent aux prochains articles." };
 }
@@ -317,4 +318,23 @@ export async function disconnectSearch() {
   const { workspace, site } = await requireSite();
   await svc.disconnectSearch(workspace.id, site.id);
   revalidatePath("/app/mots-cles");
+}
+
+// ---------------------------------------------------------------------------
+// Image de l'article
+// ---------------------------------------------------------------------------
+
+export async function createArticleImage(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace } = await requireSite();
+  const id = str(f, "id");
+  const r = await svc.illustrateArticle(workspace.id, id, { manual: true });
+  revalidatePath(`/app/articles/${id}`);
+  return r.ok ? { ok: r.value.demo ? "Image d'exemple ajoutée." : "Nouvelle image créée." } : { error: r.error };
+}
+
+export async function removeArticleImage(f: FormData) {
+  const { workspace } = await requireSite();
+  const id = str(f, "id");
+  await svc.removeArticleImage(workspace.id, id);
+  revalidatePath(`/app/articles/${id}`);
 }

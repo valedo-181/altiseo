@@ -1,6 +1,7 @@
 import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
+import { supabaseUrl } from "@/lib/supabase/url";
 import type { Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import type { DueTopic } from "@/lib/jobs/select";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
@@ -35,7 +36,7 @@ function one(r: { data: Row | null; error: { code?: string; message: string } | 
 const toSite = (r: Row): Site => ({
   id: s(r.id), workspaceId: s(r.workspace_id), url: s(r.url), name: s(r.name), theme: s(r.theme),
   language: (r.language as Site["language"]) ?? "fr", businessDescription: s(r.business_description), targetAudience: s(r.target_audience),
-  tone: s(r.tone), customInstructions: s(r.custom_instructions), mentionCompetitors: Boolean(r.mention_competitors),
+  tone: s(r.tone), customInstructions: s(r.custom_instructions), mentionCompetitors: Boolean(r.mention_competitors), featuredImages: r.featured_images !== false,
   publishTime: s(r.publish_time).slice(0, 5), timezone: s(r.timezone), publishDays: (r.publish_days as number[]) ?? [],
   publishMode: r.publish_mode === "publish" ? "publish" : "draft", targetWords: Number(r.target_words),
   onboardingStep: Number(r.onboarding_step), analyzedAt: (r.analyzed_at as string) ?? null, createdAt: s(r.created_at),
@@ -43,7 +44,7 @@ const toSite = (r: Row): Site => ({
 
 const SITE_COLS: Record<string, string> = {
   url: "url", name: "name", theme: "theme", language: "language", businessDescription: "business_description",
-  targetAudience: "target_audience", tone: "tone", customInstructions: "custom_instructions", mentionCompetitors: "mention_competitors",
+  targetAudience: "target_audience", tone: "tone", customInstructions: "custom_instructions", mentionCompetitors: "mention_competitors", featuredImages: "featured_images",
   publishTime: "publish_time", timezone: "timezone", publishDays: "publish_days", publishMode: "publish_mode",
   targetWords: "target_words", onboardingStep: "onboarding_step", analyzedAt: "analyzed_at",
 };
@@ -63,7 +64,8 @@ const toArticle = (r: Row): Article => ({
   id: s(r.id), siteId: s(r.site_id), calendarItemId: (r.calendar_item_id as string) ?? null, title: s(r.title), slug: s(r.slug),
   metaTitle: s(r.meta_title), metaDescription: s(r.meta_description), bodyMd: s(r.body_md), language: (r.language as Article["language"]) ?? "fr",
   keywords: (r.keywords as string[]) ?? [], internalLinks: (r.internal_links as Article["internalLinks"]) ?? [], wordCount: Number(r.word_count),
-  status: r.status as Article["status"], demo: Boolean(r.demo), publishedAt: (r.published_at as string) ?? null,
+  status: r.status as Article["status"], demo: Boolean(r.demo),
+  imageUrl: (r.image_url as string) ?? null, imageAlt: s(r.image_alt), imagePrompt: (r.image_prompt as string) ?? null, imageDemo: Boolean(r.image_demo), imageGenerations: Number(r.image_generations ?? 0), publishedAt: (r.published_at as string) ?? null,
   editedAt: (r.edited_at as string) ?? null, createdAt: s(r.created_at), updatedAt: s(r.updated_at),
 });
 const ART_COLS: Record<string, string> = {
@@ -84,7 +86,7 @@ const toIntegration = (r: Row): Integration => ({
 
 const toPublication = (r: Row): Publication => ({
   id: s(r.id), articleId: s(r.article_id), integrationId: s(r.integration_id), remoteId: (r.remote_id as string) ?? null,
-  remoteUrl: (r.remote_url as string) ?? null, status: r.status as Publication["status"], error: (r.last_error as string) ?? null,
+  remoteUrl: (r.remote_url as string) ?? null, remoteMediaId: (r.remote_media_id as string) ?? null, remoteMediaSrc: (r.remote_media_src as string) ?? null, status: r.status as Publication["status"], error: (r.last_error as string) ?? null,
   lastAttemptAt: s(r.last_attempt_at ?? r.updated_at),
 });
 
@@ -283,7 +285,7 @@ export const supabaseDb = {
     const a = await this.getArticle(workspaceId, p.articleId);
     if (!a) throw new AccessDenied();
     const row = one(await adminClient().from("publications").upsert({
-      workspace_id: workspaceId, article_id: p.articleId, integration_id: p.integrationId, remote_id: p.remoteId, remote_url: p.remoteUrl,
+      workspace_id: workspaceId, article_id: p.articleId, integration_id: p.integrationId, remote_id: p.remoteId, remote_url: p.remoteUrl, remote_media_id: p.remoteMediaId ?? null, remote_media_src: p.remoteMediaSrc ?? null,
       status: p.status, last_error: p.error, last_attempt_at: p.lastAttemptAt,
     }, { onConflict: "article_id,integration_id" }).select("*").single());
     return toPublication(row);
@@ -375,6 +377,31 @@ export const supabaseDb = {
   async releaseTopic(workspaceId: string, itemId: string) {
     check(await adminClient().from("calendar_items").update({ status: "approved" }).eq("id", itemId).eq("workspace_id", workspaceId).eq("status", "generating"));
   },
+
+  // Image des articles (stockage public, écrit par le serveur seulement) ------
+  async storeArticleImage(workspaceId: string, articleId: string, bytes: Uint8Array, contentType: "image/jpeg" | "image/png" | "image/webp"): Promise<string> {
+    if (!(await this.getArticle(workspaceId, articleId))) throw new AccessDenied();
+    const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
+    const path = `${workspaceId}/${articleId}-${Date.now().toString(36)}.${ext}`;
+    const up = await adminClient().storage.from("article-images").upload(path, bytes, { contentType, cacheControl: "31536000", upsert: false });
+    if (up.error) throw new Error(up.error.message);
+    return `${supabaseUrl()}/storage/v1/object/public/article-images/${path}`;
+  },
+  /** L'image précédente de notre stockage est effacée quand elle est remplacée ou retirée. */
+  async setArticleImage(workspaceId: string, articleId: string, img: { imageUrl: string | null; imageAlt: string; imagePrompt: string | null; imageDemo: boolean }, countGeneration: boolean) {
+    const a = await this.getArticle(workspaceId, articleId);
+    if (!a) throw new AccessDenied();
+    const ad = adminClient();
+    check(await ad.from("articles").update({
+      image_url: img.imageUrl, image_alt: img.imageAlt, image_prompt: img.imagePrompt, image_demo: img.imageDemo,
+      image_generations: a.imageGenerations + (countGeneration ? 1 : 0),
+    }).eq("id", articleId).eq("workspace_id", workspaceId));
+    const prefix = `${supabaseUrl()}/storage/v1/object/public/article-images/${workspaceId}/`;
+    if (a.imageUrl && a.imageUrl !== img.imageUrl && a.imageUrl.startsWith(prefix) && !a.imageUrl.includes("..")) {
+      await ad.storage.from("article-images").remove([`${workspaceId}/${a.imageUrl.slice(prefix.length)}`]).catch(() => undefined);
+    }
+  },
 };
+
 
 

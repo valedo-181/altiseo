@@ -86,6 +86,10 @@
 
 ## À faire
 
+- [ ] **Brancher Higgsfield (images des articles).** En attente : créer une clé API dans la console Higgsfield,
+      recharger le solde API (à part de l'abonnement), mettre `HIGGSFIELD_KEY_ID` et `HIGGSFIELD_KEY_SECRET` dans
+      Vercel, redéployer, puis faire un premier essai réel (jamais testé contre la vraie API).
+- [ ] **Activer la publication automatique.** En attente : `CRON_SECRET` dans Vercel, puis redéployer.
 - [ ] **Brancher le vrai Google (Search Console).** En attente. Google Cloud : projet, activer
       « Google Search Console API », écran de consentement OAuth, ID client « Application Web » avec la
       redirection `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback`. Vercel :
@@ -142,3 +146,23 @@ Code : `src/lib/jobs/` (`select.ts` pur et testé, `daily.ts`), fonction SQL `au
   horaire (Vercel Pro, `CRON_MODE=hourly`, respecte alors l'heure de publication du site) ou file de tâches.
 - Un envoi WordPress raté n'est pas retenté tout seul : l'erreur se voit sur l'article, bouton « Envoyer ».
 - Pas encore : e-mail « article prêt » (attend Resend), journal des passages dans la console admin.
+
+## Image des articles (Higgsfield)
+
+Chaque article reçoit une photo réaliste 16:9 (réglage du site « Créer une image pour chaque article », actif par défaut).
+Code : `src/lib/images/` (`prompt.ts`, `higgsfield.ts`), `illustrateArticle` dans `src/lib/app/service.ts`,
+migration `20261113000000_images_articles.sql`, stockage public Supabase `article-images` (écrit par le serveur seulement).
+
+- La rédaction (Claude) propose la scène à photographier ; un style fixe est ajouté : photo réaliste, sans texte,
+  sans logo, sans visage reconnaissable. Sans scène proposée : on part du titre et du thème.
+- API Higgsfield : dépôt sur `https://api.higgsfield.ai/<modèle>`, suivi de l'état, téléchargement (10 Mo au plus,
+  JPEG / PNG / WebP, adresse publique seulement). Modèle par défaut `z-image/turbo`, changeable par
+  `HIGGSFIELD_IMAGE_MODEL`. **Écrit d'après des extraits de la documentation (site inaccessible depuis
+  l'environnement de développement) et jamais testé contre la vraie API** : prévoir un essai réel et un ajustement
+  possible des paramètres (`aspect_ratio`, `resolution`) selon le modèle.
+- Une image qui échoue ne bloque jamais l'article : bouton « Créer une image » sur la fiche. Cinq créations au plus par article.
+- WordPress : l'image est déposée dans la médiathèque avec son texte de remplacement et devient l'image mise en
+  avant ; renvoyée seulement si elle a changé, retirée si l'article n'en a plus. Seules les adresses de notre
+  stockage sont acceptées (un membre peut modifier `image_url` dans la base : `isOwnImage`).
+- Sans `HIGGSFIELD_KEY_ID` / `HIGGSFIELD_KEY_SECRET` : image d'exemple, annoncée comme telle, jamais envoyée au site.
+- Pas encore : coût des images dans la console admin (tarif à confirmer), choix du style par client.

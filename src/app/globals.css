@@ -77,3 +77,9 @@
     .film .scene > div, .film .word, .film .shot { opacity: 1; transform: none; filter: none; }
   }
 }
+
+/* Page des tarifs : liseré lumineux des offres et halo du haut de page. Dégradés seulement, pas de flou. */
+.plan { border-radius: 16px; padding: 1px; background: rgb(var(--c-border)); transition: transform 200ms var(--motion-ease); }
+.plan-best { background: linear-gradient(140deg, rgb(var(--c-brand-cyan)), rgb(var(--c-brand-cyan) / 0.15) 45%, rgb(var(--c-highlight) / 0.8)); }
+.pricing-glow { background: radial-gradient(60% 70% at 50% 0%, rgb(var(--c-brand-cyan) / 0.14), transparent 70%); pointer-events: none; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) { section.plan:hover { transform: translateY(-4px); } }

@@ -90,6 +90,7 @@ export async function generateImage(prompt: string, o: HiggsfieldOptions): Promi
   if (res.status >= 300 && res.status < 400) return { ok: false, error: `Higgsfield renvoie vers une autre adresse (${res.status}) : le modèle « ${model} » est sans doute mal écrit.` };
   let body = await json(res);
   // 401 : clé inconnue ou mal formée. 403 : clé reconnue, mais pas le droit (API non activée, solde, modèle réservé).
+  if (res.status === 402 || /not_enough_credits|insufficient/i.test(JSON.stringify(body))) return { ok: false, error: "Le solde de l'API Higgsfield est épuisé : il faut le recharger pour créer des images." };
   if (res.status === 401) return { ok: false, error: `Higgsfield ne reconnaît pas la clé (401)${apiDetail(body, key)}. Vérifiez qu'elle vient bien de la console de l'API Higgsfield et qu'elle est entière.` };
   if (res.status === 403) return { ok: false, error: `Higgsfield reconnaît la clé mais refuse la demande (403)${apiDetail(body, key)}. Vérifiez le solde API et l'accès au modèle « ${model} ».` };
   if (res.status === 402) return { ok: false, error: "Le solde Higgsfield est épuisé : rechargez-le pour créer des images." };

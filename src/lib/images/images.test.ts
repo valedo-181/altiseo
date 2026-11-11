@@ -81,6 +81,8 @@ test("pannes : la raison est dite (délai, réseau, modèle inconnu, paramètre 
   assert.ok(!dns.ok && /ENOTFOUND/.test(dns.error));
   const model = await generateImage("p", { ...key, model: "inconnu/modele", fetcher: async () => json(404, { detail: "Not Found" }) });
   assert.ok(!model.ok && /inconnu\/modele/.test(model.error));
+  const credits = await generateImage("p", { ...key, fetcher: async () => json(403, { detail: "not_enough_credits" }) });
+  assert.ok(!credits.ok && /solde/.test(credits.error));
   const param = await generateImage("p", { ...key, fetcher: async () => json(422, { detail: [{ loc: ["body", "resolution"], msg: "id:tres-secret invalid" }] }) });
   assert.ok(!param.ok && /422/.test(param.error) && /resolution/.test(param.error) && !param.error.includes("tres-secret"));
 });

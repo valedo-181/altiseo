@@ -157,8 +157,8 @@ migration `20261113000000_images_articles.sql`, stockage public Supabase `articl
 - La rédaction (Claude) propose la scène à photographier ; un style fixe est ajouté : photo réaliste, sans texte,
   sans logo, sans visage reconnaissable. Sans scène proposée : on part du titre et du thème.
 - API Higgsfield : dépôt sur `https://api.higgsfield.ai/<modèle>`, suivi de l'état, téléchargement (10 Mo au plus,
-  JPEG / PNG / WebP, adresse publique seulement). Clé : `HIGGSFIELD_KEY_ID` + `HIGGSFIELD_KEY_SECRET`, ou la clé entière
-  dans `HIGGSFIELD_KEY_ID` si la console n'en donne qu'une. Adresse et identification vérifiées sur le client
+  JPEG / PNG / WebP, adresse publique seulement). Clé : la console donne une seule valeur « identifiant:secret », à coller
+  entière dans `HIGGSFIELD_KEY_ID` (les deux moitiés séparées, avec `HIGGSFIELD_KEY_SECRET`, marchent aussi). Adresse et identification vérifiées sur le client
   officiel `higgsfield-client` (Python). Modèle par défaut `z-image/turbo`, changeable par
   `HIGGSFIELD_IMAGE_MODEL`. **Écrit d'après des extraits de la documentation (site inaccessible depuis
   l'environnement de développement) et jamais testé contre la vraie API** : prévoir un essai réel et un ajustement

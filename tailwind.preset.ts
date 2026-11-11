@@ -34,10 +34,14 @@ export default {
         "success": c("success"),
         "success-soft": c("success-soft"),
         "info": c("info"),
-        "info-soft": c("info-soft")
+        "info-soft": c("info-soft"),
+        "highlight": c("highlight"),
+        "brand-night": c("brand-night"),
+        "brand-cyan": c("brand-cyan")
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
+        display: ["var(--font-display)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },

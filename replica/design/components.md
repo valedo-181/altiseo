@@ -11,7 +11,7 @@ Règles communes :
 - **cible tactile ≥ 40 px** sur mobile ; textes en 14 px minimum dans l'app, 16 px dans les formulaires ;
 - **icônes** : Lucide (licence ISC), 16 px dans les boutons et pastilles, 20 px dans la navigation,
   `aria-hidden` quand un texte les accompagne ;
-- **police** : Inter (licence OFL) pour l'interface, Source Serif 4 (OFL) pour l'aperçu des articles ;
+- **polices** : Unbounded pour le nom et les `h1`, Instrument Sans pour l'interface, Source Serif 4 pour l'aperçu des articles (toutes OFL) ;
 - **mouvement** : 120–200 ms ; rien d'animé si `prefers-reduced-motion`.
 
 ```

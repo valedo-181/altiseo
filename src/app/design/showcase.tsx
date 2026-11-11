@@ -58,8 +58,8 @@ export function Showcase() {
           <Logo size={24} />
           <LogoMark size={48} />
           <LogoMark size={16} />
-          <div className="flex gap-2">
-            {["bg-accent", "bg-accent-hover", "bg-accent-soft", "bg-text", "bg-surface", "bg-success", "bg-warning", "bg-danger", "bg-info"].map((c) => (
+          <div className="flex flex-wrap gap-2">
+            {["bg-brand-night", "bg-brand-cyan", "bg-highlight", "bg-accent", "bg-accent-soft", "bg-surface", "bg-success", "bg-warning", "bg-danger", "bg-info"].map((c) => (
               <span key={c} title={c} className={`size-8 rounded-md border border-border ${c}`} />
             ))}
           </div>

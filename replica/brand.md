@@ -20,32 +20,47 @@ Ce ne sont que des vérifications de base, pas un avis juridique : faire faire u
 par un spécialiste avant d'investir. Ne pas utiliser « Swiss », « Suisse », « Helvetia » ni la croix
 suisse dans la marque sans vérifier les règles « Swissness ».
 
-## Couleurs
+## Charte « courbes de niveau » (choisie le 2026-11-11, direction D)
 
-Couleur principale : **sarcelle alpine**, à mi-chemin entre le vert des forêts et le bleu des lacs.
-Sérieuse sans être le bleu de tous les outils SEO, et loin du rouge (réservé aux erreurs, et à la
-croix suisse).
+Planches des propositions : `replica/brand/propositions.png` (A, B, C) et `replica/brand/melanges.png` (D, E).
 
-| rôle | clair | sombre |
+### Logo
+
+`src/components/brand/logo.tsx`, icône d'onglet `src/app/icon.svg`, fichier source `replica/brand/altiseo-D.svg`.
+
+- **Symbole** : dans un carré arrondi nuit glaciaire, trois lignes de carte topographique emboîtées
+  dessinent un sommet et la lettre A ; un point corail marque le sommet atteint.
+- **Nom** : « altiseo » en minuscules, Unbounded 500, d'une seule couleur.
+- Le symbole garde les mêmes couleurs en mode clair et en mode sombre.
+- Taille minimale : 16 px pour le symbole seul. Marge libre autour : la moitié de sa largeur.
+- À ne pas faire : changer les couleurs, déformer, mettre le symbole sur une photo chargée,
+  écrire le nom dans une autre police.
+- C'est une proposition de travail : un graphiste peut la finaliser (SVG, icône 1024 × 1024 sans
+  transparence, image de partage 1200 × 630). Interdits : la croix suisse, toute ressemblance avec
+  le logo d'un outil SEO existant.
+
+### Couleurs
+
+| rôle | nom | clair | sombre | usage |
+| --- | --- | --- | --- | --- |
+| `brand-night` | Nuit glaciaire | `#071A2B` | `#071A2B` | fond du logo, texte, fond du mode sombre |
+| `brand-cyan` | Cyan glacier | `#35D0E0` | `#35D0E0` | logo ; couleur d'action en mode sombre |
+| `accent` | Cyan lisible | `#076B7A` | `#35D0E0` | boutons, liens, éléments actifs |
+| `highlight` | Corail du matin | `#FF6A4D` | `#FF6A4D` | touche rare : sommet du logo, « nouveau » sur fond sombre |
+| `surface` | Glace | `#F1F7F9` | `#0C2438` | fonds de page |
+
+Le cyan vif ne porte pas de texte blanc lisible : sur fond clair, l'action utilise le cyan foncé
+`#076B7A` (6,2:1). Le corail n'est jamais une couleur de texte sur fond clair, ni une couleur d'erreur
+(le rouge reste réservé aux erreurs). Toutes les valeurs : `replica/design/tokens.json`.
+Contrôle : `npm run tokens` (53 paires, 0 échec AA).
+
+### Typographie
+
+| police | rôle | licence |
 | --- | --- | --- |
-| accent | `#0b6b69` | `#5ec9c3` |
-| accent au survol | `#095755` | `#8adbd6` |
-| fond d'accent | `#e3f1f0` | `#11302f` |
-
-Toutes les autres couleurs (neutres, états) : `replica/design/tokens.json`. Contrôle :
-`npm run tokens` (48 paires, 0 échec AA).
-
-## Logo (provisoire)
-
-`src/components/brand/logo.tsx` : une ligne qui monte en dessinant deux sommets (l'altitude et la
-courbe de trafic), en blanc dans un carré sarcelle arrondi ; à côté, « alti**seo** » en Inter
-semi-gras, « seo » en sarcelle.
-
-Brief pour le logo définitif (graphiste ou outil d'image) :
-- l'idée : grimper, des sommets suisses à la première page de Google ;
-- un symbole + le nom écrit ; le symbole seul doit rester lisible à 16 px (favicon) ;
-- livrables : SVG, icône 1024 × 1024 sans transparence, favicons, image de partage 1200 × 630 ;
-- interdit : la croix suisse, l'edelweiss tel quel, toute ressemblance avec un logo d'outil SEO existant.
+| Unbounded (500) | le nom et les grands titres (`h1`) seulement : elle est très large | OFL |
+| Instrument Sans | tout le reste : texte, boutons, intertitres | OFL |
+| Source Serif 4 | aperçu des articles (lecture longue) | OFL |
 
 ## Ton
 

@@ -1,17 +1,17 @@
 /* Généré par build_tokens.py depuis tokens.json. Ne pas modifier à la main. */
 :root {
   --c-bg: 255 255 255;
-  --c-surface: 246 247 249;
-  --c-surface-sunken: 238 240 243;
-  --c-border: 228 231 236;
-  --c-border-input: 133 141 153;
-  --c-text: 18 22 28;
-  --c-text-muted: 90 99 113;
-  --c-accent: 11 107 105;
-  --c-accent-hover: 9 87 85;
-  --c-accent-soft: 227 241 240;
+  --c-surface: 241 247 249;
+  --c-surface-sunken: 228 238 241;
+  --c-border: 213 226 230;
+  --c-border-input: 110 138 147;
+  --c-text: 7 26 43;
+  --c-text-muted: 74 95 107;
+  --c-accent: 7 107 122;
+  --c-accent-hover: 5 88 106;
+  --c-accent-soft: 217 241 244;
   --c-on-accent: 255 255 255;
-  --c-focus: 11 107 105;
+  --c-focus: 7 107 122;
   --c-danger: 180 35 24;
   --c-danger-soft: 254 243 242;
   --c-warning: 147 55 13;
@@ -20,8 +20,12 @@
   --c-success-soft: 236 253 243;
   --c-info: 23 92 211;
   --c-info-soft: 239 248 255;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --font-serif: Source Serif 4, Georgia, Cambria, serif;
+  --c-highlight: 255 106 77;
+  --c-brand-night: 7 26 43;
+  --c-brand-cyan: 53 208 224;
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Unbounded Variable", "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4 Variable", Georgia, Cambria, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -43,18 +47,18 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-  --c-bg: 14 17 22;
-    --c-surface: 22 26 33;
-    --c-surface-sunken: 29 34 43;
-    --c-border: 42 48 58;
-    --c-border-input: 115 124 138;
-    --c-text: 238 241 245;
-    --c-text-muted: 163 171 184;
-    --c-accent: 94 201 195;
-    --c-accent-hover: 138 219 214;
-    --c-accent-soft: 17 48 47;
-    --c-on-accent: 14 17 22;
-    --c-focus: 94 201 195;
+  --c-bg: 7 26 43;
+    --c-surface: 12 36 56;
+    --c-surface-sunken: 18 48 72;
+    --c-border: 30 63 88;
+    --c-border-input: 108 142 162;
+    --c-text: 234 244 247;
+    --c-text-muted: 157 181 192;
+    --c-accent: 53 208 224;
+    --c-accent-hover: 111 224 236;
+    --c-accent-soft: 15 53 71;
+    --c-on-accent: 7 26 43;
+    --c-focus: 53 208 224;
     --c-danger: 249 112 102;
     --c-danger-soft: 58 21 18;
     --c-warning: 253 176 34;
@@ -63,22 +67,25 @@
     --c-success-soft: 12 44 29;
     --c-info: 132 202 255;
     --c-info-soft: 15 39 64;
+    --c-highlight: 255 106 77;
+    --c-brand-night: 7 26 43;
+    --c-brand-cyan: 53 208 224;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --c-bg: 14 17 22;
-  --c-surface: 22 26 33;
-  --c-surface-sunken: 29 34 43;
-  --c-border: 42 48 58;
-  --c-border-input: 115 124 138;
-  --c-text: 238 241 245;
-  --c-text-muted: 163 171 184;
-  --c-accent: 94 201 195;
-  --c-accent-hover: 138 219 214;
-  --c-accent-soft: 17 48 47;
-  --c-on-accent: 14 17 22;
-  --c-focus: 94 201 195;
+  --c-bg: 7 26 43;
+  --c-surface: 12 36 56;
+  --c-surface-sunken: 18 48 72;
+  --c-border: 30 63 88;
+  --c-border-input: 108 142 162;
+  --c-text: 234 244 247;
+  --c-text-muted: 157 181 192;
+  --c-accent: 53 208 224;
+  --c-accent-hover: 111 224 236;
+  --c-accent-soft: 15 53 71;
+  --c-on-accent: 7 26 43;
+  --c-focus: 53 208 224;
   --c-danger: 249 112 102;
   --c-danger-soft: 58 21 18;
   --c-warning: 253 176 34;
@@ -87,5 +94,8 @@
   --c-success-soft: 12 44 29;
   --c-info: 132 202 255;
   --c-info-soft: 15 39 64;
+  --c-highlight: 255 106 77;
+  --c-brand-night: 7 26 43;
+  --c-brand-cyan: 53 208 224;
   color-scheme: dark;
 }

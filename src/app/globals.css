@@ -1,4 +1,5 @@
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/instrument-sans";
+@import "@fontsource-variable/unbounded";
 @import "@fontsource-variable/source-serif-4";
 @import "../styles/tokens.css";
 @tailwind base;
@@ -6,12 +7,10 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --font-serif: "Source Serif 4 Variable", Georgia, Cambria, serif;
-  }
   html { @apply bg-bg text-text font-sans antialiased; }
   h1, h2, h3 { font-weight: 650; letter-spacing: -0.01em; }
+  /* Unbounded (très large) : réservé au nom et aux grands titres. */
+  h1 { font-family: var(--font-display); font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; }
   :focus-visible { outline: none; box-shadow: var(--shadow-focus); }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }

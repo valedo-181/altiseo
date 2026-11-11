@@ -34,7 +34,7 @@ def main():
         return "\n".join("  --c-%s: %s;" % (k, rgb(v)) for k, v in cols.items())
 
     lines = ["/* Généré par build_tokens.py depuis tokens.json. Ne pas modifier à la main. */", ":root {", block(light)]
-    lines += ["  --font-sans: %s;" % t["font"]["sans"], "  --font-serif: %s;" % t["font"]["serif"],
+    lines += ["  --font-sans: %s;" % t["font"]["sans"], "  --font-display: %s;" % t["font"]["display"], "  --font-serif: %s;" % t["font"]["serif"],
               "  --font-mono: %s;" % t["font"]["mono"]]
     for k, v in t["radius"].items():
         lines.append("  --radius-%s: %dpx;" % (k, v))
@@ -80,6 +80,7 @@ export default {
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
+        display: ["var(--font-display)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },

@@ -40,7 +40,7 @@ npm run test:db      # schéma + RLS sur un Postgres 16 local (initdb, pg_ctl, p
 
 Next.js 15 (App Router) + TypeScript + Tailwind CSS 3. Couleurs, tailles et rayons uniquement par
 les jetons : `replica/design/tokens.json` → `src/styles/tokens.css` + `tailwind.preset.ts`
-(`npm run tokens`), mode clair et sombre. Polices Inter et Source Serif 4 (licence OFL), icônes
+(`npm run tokens`), mode clair et sombre. Polices Unbounded, Instrument Sans et Source Serif 4 (licence OFL), icônes
 Lucide (ISC).
 
 ## Vérifier le parcours complet

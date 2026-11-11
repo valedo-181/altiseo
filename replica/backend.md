@@ -10,6 +10,7 @@
 | Base de données | `supabase/migrations/`, `src/lib/data/supabase-store.ts` | **appliqué** sur le projet Supabase « altiseo » (eu-west-1) le 2026-11-09 : 2 migrations ; 10 vérifications locales ; contrôles Supabase propres (restent 4 avertissements voulus, voir plus bas) |
 | Connexion | Supabase Auth, lien par e-mail, `src/app/auth/callback/route.ts`, `ensure_workspace()` | écrit ; à tester sur le projet |
 | Rédaction | `src/lib/ai/claude.ts` : analyse du site, 30 sujets, articles | écrit, testé avec un faux client (7 tests) ; **pas encore appelé avec une vraie clé** |
+| Site statique (GitHub) | `src/lib/cms/github.ts` : API contents de GitHub + jeton fine-grained (dépôt unique, « Contents : Read and write »), chiffré comme le mot de passe WordPress ; écrit `blog/articles/<slug>.json` + `blog/img/<slug>.jpg`, le site en fait la page (ex. `outils/blog.mjs` de domevia.ch, lancé par Vercel) | écrit, testé avec un faux GitHub (7 tests) ; migration `20261114000000_integration_github` à appliquer |
 | WordPress | `src/lib/cms/wordpress.ts` : API REST + mot de passe d'application | écrit, testé avec un faux serveur (4 tests) ; à tester sur un vrai site |
 | Chiffrement | `src/lib/crypto.ts` (AES-256-GCM) | testé |
 | Audit SEO | `src/lib/seo/` (lecture du site, 15 contrôles, PageSpeed), `runAudit` | écrit, calcul testé (3 tests) ; lecture d'un vrai site pas encore essayée en ligne |

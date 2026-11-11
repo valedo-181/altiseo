@@ -156,3 +156,16 @@ do $$ begin
 end $$;
 reset role;
 select 'schema_test : 10 vérifications OK' as resultat;
+
+-- Intégration « site statique (GitHub) » (20261114000000) : le type est accepté, un type inconnu refusé.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'integrations_kind_check'
+                 and pg_get_constraintdef(oid) like '%github%') then
+    raise exception 'integrations_kind_check doit accepter github';
+  end if;
+  if exists (select 1 from pg_constraint where conname = 'integrations_kind_check'
+             and pg_get_constraintdef(oid) like '%gitlab%') then
+    raise exception 'type inattendu';
+  end if;
+end $$;

@@ -13,7 +13,8 @@ function Counter({ value, max, soft }: { value: string; max: number; soft: numbe
 }
 
 /** S14 : édition (Markdown simple) avec aperçu, panneau SEO et aperçu Google. */
-export function ArticleEditor({ article, siteUrl, canPublish, publishMode }: { article: Article; siteUrl: string; canPublish: boolean; publishMode: "draft" | "publish" }) {
+export function ArticleEditor({ article, siteUrl, canPublish, publishMode, target = "wordpress" }: { article: Article; siteUrl: string; canPublish: boolean; publishMode: "draft" | "publish"; target?: "wordpress" | "github" }) {
+  const gh = target === "github";
   const [title, setTitle] = useState(article.title);
   const [slug, setSlug] = useState(article.slug);
   const [metaTitle, setMetaTitle] = useState(article.metaTitle);
@@ -77,14 +78,14 @@ export function ArticleEditor({ article, siteUrl, canPublish, publishMode }: { a
         <ActionForm action={publishArticle} className="card space-y-3">
           <input type="hidden" name="id" value={article.id} />
           <p className="text-sm font-semibold">{publishMode === "draft" ? "Envoyer en brouillon" : "Publier"}</p>
-          <p className="text-xs text-text-muted">{publishMode === "draft" ? "L'article arrive en brouillon dans WordPress : vous le publiez de là-bas." : "L'article paraît tout de suite sur votre site."}</p>
+          <p className="text-xs text-text-muted">{publishMode === "draft" ? (gh ? "L'article est écrit dans le dépôt du site, marqué brouillon : il n'apparaît pas encore sur le site." : "L'article arrive en brouillon dans WordPress : vous le publiez de là-bas.") : gh ? "L'article paraît sur votre site à sa prochaine mise en ligne (en général une minute)." : "L'article paraît tout de suite sur votre site."}</p>
           {canPublish ? (
             <>
-              <Submit className="w-full" disabled={dirty}>{publishMode === "draft" ? "Envoyer à WordPress" : "Publier sur WordPress"}</Submit>
+              <Submit className="w-full" disabled={dirty}>{gh ? (publishMode === "draft" ? "Envoyer en brouillon" : "Publier sur le site") : publishMode === "draft" ? "Envoyer à WordPress" : "Publier sur WordPress"}</Submit>
               {dirty && <p className="text-xs text-text-muted">Enregistrez d'abord vos modifications.</p>}
             </>
           ) : (
-            <a href="/app/integrations" className="btn btn-secondary w-full">Connecter WordPress</a>
+            <a href="/app/integrations" className="btn btn-secondary w-full">Connecter votre site</a>
           )}
         </ActionForm>
         <div className="card space-y-2">

@@ -65,7 +65,9 @@ function netError(e: unknown, what: string): string {
 /** Message d'erreur renvoyé par l'API (pour ajuster modèle et paramètres), raccourci et sans la clé. */
 function apiDetail(body: Record<string, unknown>, key: string): string {
   const raw = body.detail ?? body.message ?? body.error ?? "";
-  const text = (typeof raw === "string" ? raw : JSON.stringify(raw)).split(key).join("…").replace(/\s+/g, " ").trim().slice(0, 200);
+  let text = typeof raw === "string" ? raw : JSON.stringify(raw);
+  for (const part of [key, ...key.split(":")]) if (part.length >= 4) text = text.split(part).join("…");
+  text = text.replace(/\s+/g, " ").trim().slice(0, 200);
   return text ? ` : ${text}` : "";
 }
 
@@ -86,10 +88,12 @@ export async function generateImage(prompt: string, o: HiggsfieldOptions): Promi
     return { ok: false, error: netError(e, "depot") };
   }
   if (res.status >= 300 && res.status < 400) return { ok: false, error: `Higgsfield renvoie vers une autre adresse (${res.status}) : le modèle « ${model} » est sans doute mal écrit.` };
-  if (res.status === 401 || res.status === 403) return { ok: false, error: "Higgsfield refuse la clé d'accès. Vérifiez HIGGSFIELD_KEY_ID et HIGGSFIELD_KEY_SECRET." };
+  let body = await json(res);
+  // 401 : clé inconnue ou mal formée. 403 : clé reconnue, mais pas le droit (API non activée, solde, modèle réservé).
+  if (res.status === 401) return { ok: false, error: `Higgsfield ne reconnaît pas la clé (401)${apiDetail(body, key)}. Vérifiez qu'elle vient bien de la console de l'API Higgsfield et qu'elle est entière.` };
+  if (res.status === 403) return { ok: false, error: `Higgsfield reconnaît la clé mais refuse la demande (403)${apiDetail(body, key)}. Vérifiez le solde API et l'accès au modèle « ${model} ».` };
   if (res.status === 402) return { ok: false, error: "Le solde Higgsfield est épuisé : rechargez-le pour créer des images." };
   if (res.status === 429) return { ok: false, error: "Higgsfield limite les demandes pour le moment. Réessayez dans quelques minutes." };
-  let body = await json(res);
   if (res.status === 404) return { ok: false, error: `Higgsfield ne connaît pas le modèle d'image « ${model} » (HIGGSFIELD_IMAGE_MODEL).` };
   if (!res.ok) return { ok: false, error: `Higgsfield a refusé la demande (${res.status})${apiDetail(body, key)}.` };
 

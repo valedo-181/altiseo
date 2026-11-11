@@ -8,7 +8,7 @@ const API = "https://api.higgsfield.ai";
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
 export type ImageResult = { ok: true; bytes: Uint8Array; contentType: "image/jpeg" | "image/png" | "image/webp" } | { ok: false; error: string };
 export type HiggsfieldOptions = {
-  keyId: string; keySecret: string;
+  keyId: string; keySecret?: string;
   model?: string; // chemin du modèle, ex. « z-image/turbo »
   resolution?: string;
   fetcher?: Fetcher;
@@ -46,11 +46,12 @@ export function findImageUrl(body: unknown): string | null {
  * et la clé entière « id:secret » mise dans une seule des deux variables. null = inutilisable
  * (un caractère interdit dans un en-tête ferait échouer l'envoi sans explication).
  */
-export function higgsfieldKey(keyId: string, keySecret: string): string | null {
+export function higgsfieldKey(keyId: string, keySecret = ""): string | null {
   const tidy = (v: string) => v.trim().replace(/^["'`]+|["'`]+$/g, "").trim();
   const id = tidy(keyId), secret = tidy(keySecret);
-  const key = id.includes(":") ? id : secret.includes(":") ? secret : id && secret ? `${id}:${secret}` : "";
-  return /^[\x21-\x7e]{8,400}$/.test(key) && /^[^:]+:[^:]+$/.test(key) ? key : null;
+  // Deux valeurs : « id:secret ». Une seule : la clé telle que la console la donne (déjà « id:secret », ou d'un seul tenant).
+  const key = id.includes(":") ? id : secret.includes(":") ? secret : id && secret ? `${id}:${secret}` : id || secret;
+  return /^[\x21-\x7e]{8,400}$/.test(key) ? key : null;
 }
 
 /** Pourquoi l'appel n'a pas abouti, sans rien révéler de la clé : délai, nom introuvable, connexion refusée… */
@@ -71,7 +72,7 @@ function apiDetail(body: Record<string, unknown>, key: string): string {
 export async function generateImage(prompt: string, o: HiggsfieldOptions): Promise<ImageResult> {
   const f = o.fetcher ?? fetch;
   const key = higgsfieldKey(o.keyId, o.keySecret);
-  if (!key) return { ok: false, error: "La clé Higgsfield n'a pas la bonne forme. Dans Vercel, HIGGSFIELD_KEY_ID doit contenir l'identifiant et HIGGSFIELD_KEY_SECRET le secret, sans espace ni guillemet." };
+  if (!key) return { ok: false, error: "La clé Higgsfield n'a pas la bonne forme. Dans Vercel, mettez la clé dans HIGGSFIELD_KEY_ID (et le secret, s'il y en a un, dans HIGGSFIELD_KEY_SECRET), sans espace ni guillemet." };
   const model = (o.model || "z-image/turbo").replace(/^\/+|\/+$/g, "");
   if (!/^[a-z0-9._-]+(\/[a-z0-9._-]+){0,4}$/i.test(model)) return { ok: false, error: "Le modèle d'image configuré n'est pas valide." };
   const headers = { Authorization: `Key ${key}`, "Content-Type": "application/json", Accept: "application/json", "User-Agent": "altiseo/1.0" };

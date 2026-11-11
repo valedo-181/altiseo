@@ -304,7 +304,7 @@ export async function illustrateArticle(workspaceId: string, articleId: string, 
   // Une nouvelle demande repart de la même scène ; Higgsfield en donne une autre vue à chaque fois.
   const prompt = a.imagePrompt && !opts.idea ? a.imagePrompt : buildImagePrompt({ idea: opts.idea, title: a.title, theme: site.theme, keyword: a.keywords[0] });
   const img = await generateImage(prompt, {
-    keyId: process.env.HIGGSFIELD_KEY_ID!.trim(), keySecret: process.env.HIGGSFIELD_KEY_SECRET!.trim(),
+    keyId: process.env.HIGGSFIELD_KEY_ID ?? "", keySecret: process.env.HIGGSFIELD_KEY_SECRET ?? "",
     model: process.env.HIGGSFIELD_IMAGE_MODEL?.trim(), resolution: process.env.HIGGSFIELD_IMAGE_RESOLUTION?.trim(),
     isPublic: async (u) => Boolean(await publicUrl(u)),
   });

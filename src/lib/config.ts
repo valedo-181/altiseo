@@ -11,7 +11,7 @@ export const config = {
   /** Envoi réel aux CMS : base réelle + clé de chiffrement des identifiants. */
   cms: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.ENCRYPTION_KEY),
   /** Images d'articles : clé de l'API Higgsfield + stockage Supabase pour les garder. */
-  images: Boolean(process.env.HIGGSFIELD_KEY_ID && process.env.HIGGSFIELD_KEY_SECRET && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+  images: Boolean((process.env.HIGGSFIELD_KEY_ID || process.env.HIGGSFIELD_KEY_SECRET) && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
   /** Google Search Console : identifiants OAuth de Google + de quoi garder le jeton chiffré. */
   search: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.ENCRYPTION_KEY),
 };

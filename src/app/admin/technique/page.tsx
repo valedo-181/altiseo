@@ -18,7 +18,7 @@ const KIND = { publication: "Envoi au site refusé", topic: "Rédaction en éche
 const SERVICES = (): Array<[string, boolean, string]> => [
   ["Rédaction (Claude)", config.ai, "ANTHROPIC_API_KEY"],
   ["Envoi à WordPress", config.cms, "ENCRYPTION_KEY"],
-  ["Images des articles (Higgsfield)", config.images, "HIGGSFIELD_KEY_ID et HIGGSFIELD_KEY_SECRET"],
+  ["Images des articles (Higgsfield)", config.images, "HIGGSFIELD_KEY_ID"],
   ["Mots-clés (Google Search Console)", config.search, "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et ENCRYPTION_KEY"],
   [`Publication automatique (${cronMode === "hourly" ? "chaque heure" : "chaque jour"})`, Boolean(process.env.CRON_SECRET?.trim()), "CRON_SECRET"],
 ];

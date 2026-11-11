@@ -67,7 +67,8 @@ test("clé Higgsfield : guillemets et espaces tolérés, clé entière dans une 
   assert.equal(higgsfieldKey("", "abc123:s3cr3t-xyz"), "abc123:s3cr3t-xyz");
   assert.equal(higgsfieldKey("abc 123", "s3cr3t-xyz"), null);
   assert.equal(higgsfieldKey("abc123", "secrét-xyz"), null);
-  assert.equal(higgsfieldKey("abc123", ""), null);
+  assert.equal(higgsfieldKey("hf_abc123456", ""), "hf_abc123456", "clé d'un seul tenant acceptée telle quelle");
+  assert.equal(higgsfieldKey("abc", ""), null);
   let called = false;
   const r = await generateImage("p", { keyId: "abc 123", keySecret: "x", fetcher: async () => { called = true; return json(200, {}); } });
   assert.ok(!r.ok && /bonne forme/.test(r.error) && !called);

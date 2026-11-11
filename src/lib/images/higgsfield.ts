@@ -41,25 +41,56 @@ export function findImageUrl(body: unknown): string | null {
   return found.find((u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u)) ?? found[0] ?? null;
 }
 
+/**
+ * La clé telle qu'elle part dans l'en-tête. Tolère les guillemets et les espaces collés par mégarde,
+ * et la clé entière « id:secret » mise dans une seule des deux variables. null = inutilisable
+ * (un caractère interdit dans un en-tête ferait échouer l'envoi sans explication).
+ */
+export function higgsfieldKey(keyId: string, keySecret: string): string | null {
+  const tidy = (v: string) => v.trim().replace(/^["'`]+|["'`]+$/g, "").trim();
+  const id = tidy(keyId), secret = tidy(keySecret);
+  const key = id.includes(":") ? id : secret.includes(":") ? secret : id && secret ? `${id}:${secret}` : "";
+  return /^[\x21-\x7e]{8,400}$/.test(key) && /^[^:]+:[^:]+$/.test(key) ? key : null;
+}
+
+/** Pourquoi l'appel n'a pas abouti, sans rien révéler de la clé : délai, nom introuvable, connexion refusée… */
+function netError(e: unknown, what: string): string {
+  const err = e as { name?: string; cause?: { code?: string } };
+  const code = err?.name === "TimeoutError" || err?.name === "AbortError" ? "délai dépassé" : err?.cause?.code ?? err?.name ?? "erreur réseau";
+  console.error("higgsfield", what, code);
+  return `Higgsfield ne répond pas (${code}). Réessayez dans un instant.`;
+}
+
+/** Message d'erreur renvoyé par l'API (pour ajuster modèle et paramètres), raccourci et sans la clé. */
+function apiDetail(body: Record<string, unknown>, key: string): string {
+  const raw = body.detail ?? body.message ?? body.error ?? "";
+  const text = (typeof raw === "string" ? raw : JSON.stringify(raw)).split(key).join("…").replace(/\s+/g, " ").trim().slice(0, 200);
+  return text ? ` : ${text}` : "";
+}
+
 export async function generateImage(prompt: string, o: HiggsfieldOptions): Promise<ImageResult> {
   const f = o.fetcher ?? fetch;
+  const key = higgsfieldKey(o.keyId, o.keySecret);
+  if (!key) return { ok: false, error: "La clé Higgsfield n'a pas la bonne forme. Dans Vercel, HIGGSFIELD_KEY_ID doit contenir l'identifiant et HIGGSFIELD_KEY_SECRET le secret, sans espace ni guillemet." };
   const model = (o.model || "z-image/turbo").replace(/^\/+|\/+$/g, "");
   if (!/^[a-z0-9._-]+(\/[a-z0-9._-]+){0,4}$/i.test(model)) return { ok: false, error: "Le modèle d'image configuré n'est pas valide." };
-  const headers = { Authorization: `Key ${o.keyId}:${o.keySecret}`, "Content-Type": "application/json", Accept: "application/json" };
+  const headers = { Authorization: `Key ${key}`, "Content-Type": "application/json", Accept: "application/json", "User-Agent": "altiseo/1.0" };
   const timeoutMs = o.timeoutMs ?? 90_000, pollMs = o.pollMs ?? 3000, t0 = Date.now();
   const json = async (r: Response) => { try { return (await r.json()) as Record<string, unknown>; } catch { return {}; } };
 
   let res: Response;
   try {
-    res = await f(`${API}/${model}`, { method: "POST", headers, body: JSON.stringify({ prompt, aspect_ratio: "16:9", resolution: o.resolution || "1k" }), signal: AbortSignal.timeout(30_000), redirect: "error" });
-  } catch {
-    return { ok: false, error: "Higgsfield ne répond pas. Réessayez dans un instant." };
+    res = await f(`${API}/${model}`, { method: "POST", headers, body: JSON.stringify({ prompt, aspect_ratio: "16:9", resolution: o.resolution || "1k" }), signal: AbortSignal.timeout(90_000), redirect: "manual" });
+  } catch (e) {
+    return { ok: false, error: netError(e, "depot") };
   }
+  if (res.status >= 300 && res.status < 400) return { ok: false, error: `Higgsfield renvoie vers une autre adresse (${res.status}) : le modèle « ${model} » est sans doute mal écrit.` };
   if (res.status === 401 || res.status === 403) return { ok: false, error: "Higgsfield refuse la clé d'accès. Vérifiez HIGGSFIELD_KEY_ID et HIGGSFIELD_KEY_SECRET." };
   if (res.status === 402) return { ok: false, error: "Le solde Higgsfield est épuisé : rechargez-le pour créer des images." };
   if (res.status === 429) return { ok: false, error: "Higgsfield limite les demandes pour le moment. Réessayez dans quelques minutes." };
-  if (!res.ok) return { ok: false, error: `Higgsfield a refusé la demande (${res.status}).` };
   let body = await json(res);
+  if (res.status === 404) return { ok: false, error: `Higgsfield ne connaît pas le modèle d'image « ${model} » (HIGGSFIELD_IMAGE_MODEL).` };
+  if (!res.ok) return { ok: false, error: `Higgsfield a refusé la demande (${res.status})${apiDetail(body, key)}.` };
 
   const id = String(body.request_id ?? body.id ?? "");
   const given = typeof body.status_url === "string" ? body.status_url : "";
@@ -72,11 +103,11 @@ export async function generateImage(prompt: string, o: HiggsfieldOptions): Promi
     if (Date.now() - t0 > timeoutMs) return { ok: false, error: "L'image met trop de temps à arriver. Réessayez." };
     await new Promise((r) => setTimeout(r, pollMs));
     try {
-      const r = await f(statusUrl, { method: "GET", headers, signal: AbortSignal.timeout(15_000), redirect: "error" });
-      if (!r.ok) return { ok: false, error: `Higgsfield a renvoyé une erreur (${r.status}).` };
+      const r = await f(statusUrl, { method: "GET", headers, signal: AbortSignal.timeout(20_000), redirect: "manual" });
+      if (!r.ok) return { ok: false, error: `Higgsfield a renvoyé une erreur pendant le suivi (${r.status}).` };
       body = await json(r);
-    } catch {
-      return { ok: false, error: "Higgsfield ne répond pas. Réessayez dans un instant." };
+    } catch (e) {
+      return { ok: false, error: netError(e, "suivi") };
     }
   }
 
@@ -84,14 +115,15 @@ export async function generateImage(prompt: string, o: HiggsfieldOptions): Promi
   if (!url) return { ok: false, error: "Higgsfield n'a pas renvoyé d'image." };
   if (o.isPublic && !(await o.isPublic(url))) return { ok: false, error: "L'adresse de l'image n'est pas valide." };
   try {
-    const img = await f(url, { method: "GET", signal: AbortSignal.timeout(30_000), redirect: "error" });
+    const img = await f(url, { method: "GET", signal: AbortSignal.timeout(45_000), redirect: "follow" });
     const type = (img.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
     const contentType = TYPES.find((t) => t === type);
     if (!img.ok || !contentType) return { ok: false, error: "Le fichier reçu n'est pas une image utilisable." };
     const bytes = new Uint8Array(await img.arrayBuffer());
     if (!bytes.length || bytes.length > MAX_BYTES) return { ok: false, error: "L'image reçue est vide ou trop lourde." };
     return { ok: true, bytes, contentType };
-  } catch {
-    return { ok: false, error: "L'image n'a pas pu être téléchargée." };
+  } catch (e) {
+    netError(e, "telechargement");
+    return { ok: false, error: "L'image a été créée, mais n'a pas pu être téléchargée. Réessayez." };
   }
 }

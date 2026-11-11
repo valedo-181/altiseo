@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildImagePrompt, imageAlt, isOwnImage, IMAGE_STYLE } from "./prompt.ts";
-import { findImageUrl, generateImage } from "./higgsfield.ts";
+import { findImageUrl, generateImage, higgsfieldKey } from "./higgsfield.ts";
 
 test("la demande d'image impose la photo réaliste, sans texte ni visage", () => {
   const p = buildImagePrompt({ idea: "Stacked moving boxes in a bright empty living room.", title: "T", theme: "déménagement" });
@@ -59,4 +59,27 @@ test("refus, filtre de contenu, fichier qui n'est pas une image : erreurs lisibl
   assert.ok(!foreign.ok && /suivi/.test(foreign.error), "un lien de suivi hors de Higgsfield n'est pas suivi");
   const model = await generateImage("p", { ...key, model: "https://evil.example", fetcher: async () => json(200, {}) });
   assert.ok(!model.ok);
+});
+
+test("clé Higgsfield : guillemets et espaces tolérés, clé entière dans une seule variable, caractères interdits refusés", async () => {
+  assert.equal(higgsfieldKey(" abc123 ", '"s3cr3t-xyz"\n'), "abc123:s3cr3t-xyz");
+  assert.equal(higgsfieldKey("abc123:s3cr3t-xyz", ""), "abc123:s3cr3t-xyz");
+  assert.equal(higgsfieldKey("", "abc123:s3cr3t-xyz"), "abc123:s3cr3t-xyz");
+  assert.equal(higgsfieldKey("abc 123", "s3cr3t-xyz"), null);
+  assert.equal(higgsfieldKey("abc123", "secrét-xyz"), null);
+  assert.equal(higgsfieldKey("abc123", ""), null);
+  let called = false;
+  const r = await generateImage("p", { keyId: "abc 123", keySecret: "x", fetcher: async () => { called = true; return json(200, {}); } });
+  assert.ok(!r.ok && /bonne forme/.test(r.error) && !called);
+});
+
+test("pannes : la raison est dite (délai, réseau, modèle inconnu, paramètre refusé), jamais la clé", async () => {
+  const timeout = await generateImage("p", { ...key, fetcher: async () => { throw Object.assign(new Error("x"), { name: "TimeoutError" }); } });
+  assert.ok(!timeout.ok && /délai dépassé/.test(timeout.error));
+  const dns = await generateImage("p", { ...key, fetcher: async () => { throw Object.assign(new TypeError("fetch failed"), { cause: { code: "ENOTFOUND" } }); } });
+  assert.ok(!dns.ok && /ENOTFOUND/.test(dns.error));
+  const model = await generateImage("p", { ...key, model: "inconnu/modele", fetcher: async () => json(404, { detail: "Not Found" }) });
+  assert.ok(!model.ok && /inconnu\/modele/.test(model.error));
+  const param = await generateImage("p", { ...key, fetcher: async () => json(422, { detail: [{ loc: ["body", "resolution"], msg: "id:tres-secret invalid" }] }) });
+  assert.ok(!param.ok && /422/.test(param.error) && /resolution/.test(param.error) && !param.error.includes("tres-secret"));
 });

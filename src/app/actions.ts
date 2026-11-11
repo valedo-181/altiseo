@@ -242,7 +242,9 @@ export async function publishArticle(_: FormState, f: FormData): Promise<FormSta
   if (!r.ok) return { error: r.error };
   const sim = r.value.simulated ? " (simulation)" : "";
   const img = r.value.imageMissing ? " L'image n'a pas pu être envoyée : l'article est parti sans elle." : "";
-  return { ok: (r.value.mode === "draft" ? `Envoyé en brouillon sur WordPress${sim}.` : `Publié sur WordPress${sim}.`) + img };
+  const where = r.value.target === "github" ? "le dépôt du site" : "WordPress";
+  const done = r.value.target === "github" && r.value.mode === "publish" ? `Publié${sim} : l'article paraît sur le site à sa prochaine mise en ligne (en général une minute).` : r.value.mode === "draft" ? `Envoyé en brouillon sur ${where}${sim}.` : `Publié sur WordPress${sim}.`;
+  return { ok: done + img };
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +256,13 @@ export async function connectWordPress(_: FormState, f: FormData): Promise<FormS
   const r = await svc.connectWordPress(workspace.id, site.id, { endpoint: str(f, "endpoint"), username: str(f, "username"), appPassword: str(f, "appPassword") });
   revalidatePath("/app/integrations");
   return r.ok ? { ok: config.cms ? "WordPress est connecté : la connexion a été testée." : "WordPress est connecté (simulation : rien n'est envoyé)." } : { error: r.error };
+}
+
+export async function connectGitHub(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await svc.connectGitHub(workspace.id, site.id, { siteUrl: str(f, "siteUrl"), repo: str(f, "repo"), branch: str(f, "branch"), dir: str(f, "dir"), token: str(f, "token") });
+  revalidatePath("/app/integrations");
+  return r.ok ? { ok: config.cms ? "Le dépôt GitHub est connecté : l'accès en écriture a été vérifié." : "Le dépôt GitHub est connecté (simulation : rien n'est envoyé)." } : { error: r.error };
 }
 
 export async function disconnectIntegration(f: FormData) {

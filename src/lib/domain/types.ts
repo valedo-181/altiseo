@@ -7,7 +7,7 @@ export type Lang = "fr" | "de" | "it" | "en";
 export type PublishMode = "draft" | "publish";
 export type CalendarStatus = "proposed" | "approved" | "generating" | "done" | "failed" | "skipped";
 export type ArticleStatus = "draft" | "scheduled" | "published" | "failed" | "archived";
-export type IntegrationKind = "wordpress" | "webflow" | "shopify" | "framer" | "wix" | "ghost" | "webhook";
+export type IntegrationKind = "wordpress" | "webflow" | "shopify" | "framer" | "wix" | "ghost" | "webhook" | "github";
 export type IntegrationStatus = "pending" | "ok" | "error" | "disabled";
 
 export type User = { id: string; email: string; name: string | null; createdAt: string };
@@ -94,7 +94,8 @@ export type Integration = {
   siteId: string;
   kind: IntegrationKind;
   status: IntegrationStatus;
-  config: { endpoint?: string; username?: string };
+  /** WordPress : endpoint + username. GitHub (site statique) : repo + branch + dir, endpoint = adresse du site. */
+  config: { endpoint?: string; username?: string; repo?: string; branch?: string; dir?: string };
   lastError: string | null;
   lastTestedAt: string | null;
   demo: boolean; // connexion simulée : rien n'est envoyé

@@ -3,10 +3,10 @@ import { ImageIcon } from "lucide-react";
 import { createArticleImage, removeArticleImage } from "@/app/actions";
 import { ActionForm, Submit } from "@/components/forms/action-form";
 
-type Props = { id: string; url: string | null; alt: string; demo: boolean; left: number };
+type Props = { id: string; url: string | null; alt: string; demo: boolean; left: number; target?: "wordpress" | "github" };
 
 /** Image d'illustration de l'article : aperçu, « Changer l'image » (nombre d'essais limité) et « Retirer ». */
-export function ArticleImage({ id, url, alt, demo, left }: Props) {
+export function ArticleImage({ id, url, alt, demo, left, target = "wordpress" }: Props) {
   return (
     <section aria-labelledby="h-image" className="card">
       <div className="flex flex-wrap items-start gap-4">
@@ -22,7 +22,7 @@ export function ArticleImage({ id, url, alt, demo, left }: Props) {
           <div>
             <h2 id="h-image" className="font-semibold">Image de l'article</h2>
             <p className="mt-1 text-sm text-text-muted">
-              {!url ? "Cet article n'a pas d'image." : demo ? "Image d'exemple : la création d'images n'est pas encore branchée. Elle ne sera pas envoyée sur votre site." : "Photo créée pour cet article. Elle part avec lui comme image mise en avant dans WordPress."}
+              {!url ? "Cet article n'a pas d'image." : demo ? "Image d'exemple : la création d'images n'est pas encore branchée. Elle ne sera pas envoyée sur votre site." : target === "github" ? "Photo créée pour cet article. Elle part avec lui dans le dépôt du site et s'affiche en tête de l'article." : "Photo créée pour cet article. Elle part avec lui comme image mise en avant dans WordPress."}
             </p>
             {url && !demo && <p className="mt-1 text-xs text-text-muted">Description pour Google et les lecteurs d'écran : « {alt} »</p>}
           </div>

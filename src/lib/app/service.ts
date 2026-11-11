@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { AiError, analyzeSite, planTopics, writeArticle, type SiteBrief } from "@/lib/ai/claude";
 import { testWordPress, uploadWordPressMedia, upsertWordPressPost } from "@/lib/cms/wordpress";
+import { isBranch, isDir, isRepo, looksLikeGitHubToken, publicArticleUrl, testGitHub, upsertGitHubArticle } from "@/lib/cms/github";
 import { config } from "@/lib/config";
 import { db } from "@/lib/data/store";
 import { scoreSite } from "@/lib/seo/audit";
@@ -12,7 +13,7 @@ import { addDays, localDate, publishDates } from "@/lib/domain/dates";
 import { markdownToHtml, wordCount } from "@/lib/domain/markdown";
 import { alternativeDemoTopic, planDemoTopics } from "@/lib/domain/plan";
 import { slugify, uniqueSlug } from "@/lib/domain/slug";
-import { MAX_REGENERATIONS, type Article, type Site } from "@/lib/domain/types";
+import { MAX_REGENERATIONS, type Article, type Integration, type Site } from "@/lib/domain/types";
 import { generateImage } from "@/lib/images/higgsfield";
 import { buildImagePrompt, imageAlt, isOwnImage, MAX_IMAGE_GENERATIONS } from "@/lib/images/prompt";
 import { supabaseUrl } from "@/lib/supabase/url";
@@ -165,8 +166,9 @@ export async function writeArticleForTopic(workspaceId: string, itemId: string):
   let w: ReturnType<typeof writeDemoArticle>;
   let cost: { inputTokens: number; outputTokens: number; microUsd: number } | undefined;
   if (config.ai) {
-    // Liens internes : articles déjà publiés (adresse WordPress « nom de l'article »).
-    const pages = articles.filter((a) => a.status === "published").map((a) => ({ title: a.title, url: `${site.url}/${a.slug}/` }));
+    // Liens internes : articles déjà publiés, à leur adresse sur le site (WordPress ou site statique).
+    const integ = (await db.listIntegrations(workspaceId, site.id)).find((i) => i.status === "ok");
+    const pages = articles.filter((a) => a.status === "published").map((a) => ({ title: a.title, url: articleUrl(site, integ, a.slug) }));
     try {
       const r = await writeArticle({ site: await brief(workspaceId, site), title: item.title, angle: item.angle, keyword: item.keyword, pages });
       w = r.article;
@@ -250,6 +252,37 @@ export async function connectWordPress(workspaceId: string, siteId: string, f: {
   return { ok: true, value: undefined };
 }
 
+/** Adresse publique d'un article : « nom-de-l-article/ » sur WordPress, « blog/nom.html » sur un site statique. */
+export function articleUrl(site: Pick<Site, "url">, integ: Pick<Integration, "kind" | "config"> | undefined, slug: string): string {
+  if (integ?.kind === "github") return publicArticleUrl(integ.config.endpoint ?? site.url, integ.config.dir ?? "blog", slug);
+  return `${(integ?.config.endpoint ?? site.url).replace(/\/+$/, "")}/${slug}/`;
+}
+
+/**
+ * Site statique sur GitHub (ex. domevia.ch sur Vercel) : Altiseo écrit chaque article en JSON dans le
+ * dépôt, le site en fait une page à sa mise en ligne. Jeton fine-grained limité au dépôt, chiffré.
+ */
+export async function connectGitHub(workspaceId: string, siteId: string, f: { siteUrl: string; repo: string; branch: string; dir: string; token: string }): Promise<Result> {
+  const u = normalizeSiteUrl(f.siteUrl);
+  if (!u.ok) return fail(u.error);
+  const repo = f.repo.trim().replace(/^https:\/\/github\.com\//i, "").replace(/\.git$/i, "").replace(/\/+$/, "");
+  const branch = f.branch.trim() || "main";
+  const dir = f.dir.trim().replace(/^\/+|\/+$/g, "") || "blog";
+  if (!isRepo(repo)) return fail("Indiquez le dépôt sous la forme propriétaire/dépôt (ex. valedo-181/domevia).");
+  if (!isBranch(branch)) return fail("Nom de branche invalide.");
+  if (!isDir(dir)) return fail("Dossier invalide : lettres minuscules, chiffres et tirets (ex. blog).");
+  if (!looksLikeGitHubToken(f.token)) return fail("Ce n'est pas un jeton GitHub (il commence par github_pat_). Créez-le dans GitHub : Settings → Developer settings → Fine-grained tokens.");
+  const cfg = { endpoint: u.url, repo, branch, dir };
+  if (config.cms) {
+    const t = await testGitHub({ repo, branch, dir, token: f.token.trim() });
+    if (!t.ok) return fail(t.error);
+    await db.saveIntegration(workspaceId, siteId, { kind: "github", status: "ok", config: cfg, lastError: null, lastTestedAt: new Date().toISOString(), demo: false }, f.token.trim());
+    return { ok: true, value: undefined };
+  }
+  await db.saveIntegration(workspaceId, siteId, { kind: "github", status: "ok", config: cfg, lastError: null, lastTestedAt: new Date().toISOString(), demo: true });
+  return { ok: true, value: undefined };
+}
+
 /** F04 : envoie l'article au CMS (création, puis mise à jour du même billet). En démo : simulé. */
 /** Image d'exemple quand la clé Higgsfield n'est pas là : jamais envoyée au site du client. */
 const SAMPLE_IMAGE = "/brand/sommet.jpg";
@@ -302,7 +335,7 @@ async function ownImageBytes(a: Article): Promise<{ bytes: Uint8Array; contentTy
   }
 }
 
-export async function publishArticle(workspaceId: string, articleId: string): Promise<Result<{ mode: "draft" | "publish"; url: string; simulated: boolean; imageMissing?: boolean }>> {
+export async function publishArticle(workspaceId: string, articleId: string): Promise<Result<{ mode: "draft" | "publish"; url: string; simulated: boolean; imageMissing?: boolean; target?: "github" }>> {
   const a = await db.getArticle(workspaceId, articleId);
   if (!a) return fail("Article introuvable.");
   const site = await db.getSite(workspaceId, a.siteId);
@@ -310,6 +343,29 @@ export async function publishArticle(workspaceId: string, articleId: string): Pr
   if (!integ) return fail("Connectez d'abord votre site (Intégrations).");
   const html = markdownToHtml(a.bodyMd); // ce qui part vers le CMS
   const prev = await db.publicationOf(workspaceId, a.id);
+  if (!integ.demo && config.cms && integ.kind === "github") {
+    const token = await db.integrationSecret(workspaceId, integ.id);
+    const { repo, branch, dir, endpoint } = integ.config;
+    if (!token || !repo || !branch || !dir || !endpoint) return fail("Reconnectez le dépôt GitHub (réglages manquants).");
+    const keep = a.imageUrl && !a.imageDemo && prev?.remoteMediaId && prev.remoteMediaSrc === a.imageUrl ? prev.remoteMediaId : null;
+    const file = a.imageUrl && !a.imageDemo && !keep ? await ownImageBytes(a) : null;
+    const at = new Date().toISOString();
+    const draft = site.publishMode === "draft";
+    const r = await upsertGitHubArticle({ repo, branch, dir, token }, endpoint, {
+      slug: a.slug, title: a.title, metaTitle: a.metaTitle, description: a.metaDescription,
+      date: a.publishedAt ?? at, updated: a.publishedAt ? at : null, keyword: a.keywords[0] ?? null, html, draft,
+      image: file ? { bytes: file.bytes, ext: file.contentType === "image/png" ? "png" : file.contentType === "image/webp" ? "webp" : "jpg", alt: a.imageAlt } : null,
+      keepImage: keep,
+    }, prev?.remoteId ?? null, prev?.remoteMediaId ?? null);
+    if (!r.ok) {
+      await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: prev?.remoteId ?? null, remoteUrl: prev?.remoteUrl ?? null, remoteMediaId: prev?.remoteMediaId ?? null, remoteMediaSrc: prev?.remoteMediaSrc ?? null, status: "error", error: r.error, lastAttemptAt: at });
+      return fail(r.error);
+    }
+    const imageMissing = r.value.imageMissing || Boolean(a.imageUrl && !a.imageDemo && !keep && !file);
+    await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: r.value.id, remoteUrl: r.value.url, remoteMediaId: r.value.image, remoteMediaSrc: r.value.image ? a.imageUrl : null, status: "ok", error: null, lastAttemptAt: at });
+    await db.updateArticle(workspaceId, a.id, { status: draft ? "draft" : "published", publishedAt: draft ? a.publishedAt : (a.publishedAt ?? at) });
+    return { ok: true, value: { mode: site.publishMode, url: r.value.url, simulated: false, imageMissing, target: "github" } };
+  }
   if (!integ.demo && config.cms) {
     const secret = await db.integrationSecret(workspaceId, integ.id);
     if (!secret || !integ.config.endpoint || !integ.config.username) return fail("Reconnectez WordPress (identifiants manquants).");
@@ -344,14 +400,16 @@ export async function publishArticle(workspaceId: string, articleId: string): Pr
   }
   const remoteId = prev?.remoteId ?? `demo-${createHash("sha256").update(a.id).digest("hex").slice(0, 6)}`;
   const base = integ.config.endpoint ?? site.url;
-  const url = site.publishMode === "draft" ? `${base}/wp-admin/post.php?post=${remoteId}&action=edit` : `${base}/${a.slug}/`;
+  const url = integ.kind === "github"
+    ? (site.publishMode === "draft" ? `https://github.com/${integ.config.repo}/blob/${integ.config.branch}/${integ.config.dir}/articles/${a.slug}.json` : articleUrl(site, integ, a.slug))
+    : site.publishMode === "draft" ? `${base}/wp-admin/post.php?post=${remoteId}&action=edit` : `${base}/${a.slug}/`;
   await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId, remoteUrl: url, status: "ok", error: null, lastAttemptAt: new Date().toISOString() });
   await db.updateArticle(workspaceId, a.id, {
     status: site.publishMode === "publish" ? "published" : "draft",
     publishedAt: site.publishMode === "publish" ? (a.publishedAt ?? new Date().toISOString()) : a.publishedAt,
   });
   void html;
-  return { ok: true, value: { mode: site.publishMode, url, simulated: true } };
+  return { ok: true, value: { mode: site.publishMode, url, simulated: true, ...(integ.kind === "github" ? { target: "github" as const } : {}) } };
 }
 
 /** Délai minimal entre deux audits d'un même site (chaque audit lit jusqu'à 30 pages du site). */

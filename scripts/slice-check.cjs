@@ -123,6 +123,25 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
     assert(r.status() === 200, `${path} répond`);
     await shot(name);
   }
+  console.log("Site statique (GitHub) à la place de WordPress");
+  await page.goto(BASE + "/app/integrations");
+  await page.getByText("Utiliser un site statique à la place").click();
+  await page.getByLabel("Dépôt GitHub du site").fill("valedo-181/domevia");
+  await page.getByLabel("Jeton d'accès GitHub").fill("mot-de-passe");
+  await page.getByRole("button", { name: "Connecter et tester" }).last().click();
+  await page.getByText("Ce n'est pas un jeton GitHub").waitFor();
+  assert(true, "mauvais jeton GitHub refusé");
+  await page.getByLabel("Jeton d'accès GitHub").fill("github_pat_" + "A1b2".repeat(15));
+  await page.getByRole("button", { name: "Connecter et tester" }).last().click();
+  await page.getByText(/valedo-181\/domevia · main/).waitFor();
+  assert(await page.getByText("Connecté (simulation)").count() === 1, "dépôt connecté, WordPress remplacé");
+  await shot("S17-github");
+  await page.goto(articleUrl);
+  await page.getByRole("button", { name: "Envoyer en brouillon" }).last().click();
+  await page.getByText("Envoyé en brouillon sur le dépôt du site (simulation).").waitFor();
+  assert(await page.getByText(/Envoyé à votre site le/).count() === 1, "article envoyé au dépôt");
+  await shot("S14-github");
+
   console.log("Mots-clés (chiffres d'exemple)");
   await page.goto(BASE + "/app/mots-cles");
   assert(await page.getByText("Connectez Google Search Console").count() === 1, "invitation à connecter Search Console");

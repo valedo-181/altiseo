@@ -86,7 +86,7 @@ export function LanguageStep({ site }: { site: Site }) {
 export function PublishingStep({ endpoint, username }: { endpoint: string; username?: string }) {
   return (
     <ActionForm action={A.onboardingPublishing} className="space-y-5">
-      <p className="text-sm text-text-muted">Altiseo publie sur WordPress sans plugin. Webflow, Shopify et les sites sur mesure arrivent bientôt.</p>
+      <p className="text-sm text-text-muted">Altiseo publie sur WordPress sans plugin. Site en HTML sur GitHub (Vercel, Netlify) : connectez-le ensuite dans Intégrations. Webflow et Shopify arrivent bientôt.</p>
       <WordPressFields endpoint={endpoint} username={username} />
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <Submit size="lg">Connecter WordPress</Submit>

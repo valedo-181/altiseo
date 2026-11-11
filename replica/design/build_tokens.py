@@ -47,7 +47,7 @@ def main():
             lines.append("  --layout-%s: %dpx;" % (k, v))
     lines += ["  color-scheme: light;", "}",
               '@media (prefers-color-scheme: dark) {', '  :root:not([data-theme="light"]) {', block(dark).replace("\n", "\n  "), "    color-scheme: dark;", "  }", "}",
-              ':root[data-theme="dark"] {', block(dark), "  color-scheme: dark;", "}", ""]
+              ':root[data-theme="dark"], [data-theme="dark"] {', block(dark), "  color-scheme: dark;", "}", ""]
     os.makedirs(os.path.dirname(CSS_OUT), exist_ok=True)
     with open(CSS_OUT, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))

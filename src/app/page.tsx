@@ -21,7 +21,7 @@ export default function Home() {
           <p className="mt-4 text-lg font-normal text-text-muted">Altiseo prépare vos sujets, écrit vos articles et les publie sur votre site. Vous gardez la main sur chaque texte.</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/inscription" className={buttonClass("primary", "lg")}>Essayer 3 jours gratuitement</Link>
-            <Link href="/tarifs" className={buttonClass("secondary", "lg")}>Voir les tarifs</Link>
+            <Link href="/services" className={buttonClass("secondary", "lg")}>Découvrir nos services</Link>
           </div>
         </section>
         <section aria-labelledby="h-how" className="pb-20">

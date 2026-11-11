@@ -73,7 +73,7 @@
     color-scheme: dark;
   }
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"], [data-theme="dark"] {
   --c-bg: 7 26 43;
   --c-surface: 12 36 56;
   --c-surface-sunken: 18 48 72;

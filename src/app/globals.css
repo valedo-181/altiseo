@@ -55,3 +55,10 @@
   .prose-article blockquote { @apply border-l-4 border-border pl-4 text-text-muted; }
   .prose-article > :first-child { @apply mt-0; }
 }
+
+/* Page des services (« film ») : chaque scène s'éclaire en arrivant à l'écran. */
+@layer components {
+  .film .scene > div { opacity: 0.25; transform: translateY(16px); transition: opacity 500ms var(--motion-ease), transform 500ms var(--motion-ease); }
+  .film .scene.is-in > div { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .film .scene > div { opacity: 1; transform: none; } }
+}

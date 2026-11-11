@@ -5,6 +5,15 @@ import { supabaseUrl } from "@/lib/supabase/url";
 /** Rafraîchit la session Supabase à chaque requête (sans effet en mode démo). */
 export async function middleware(request: NextRequest) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return NextResponse.next();
+  // Lien de connexion arrivé sur l'accueil (Supabase retombe sur sa « Site URL » quand l'adresse de
+  // retour n'est pas dans sa liste) : on le conduit quand même à /auth/callback.
+  if (request.nextUrl.pathname === "/") {
+    const code = request.nextUrl.searchParams.get("code");
+    if (!code) return NextResponse.next();
+    const to = request.nextUrl.clone();
+    to.pathname = "/auth/callback";
+    return NextResponse.redirect(to);
+  }
   let response = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl()!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim(), {
     cookies: {
@@ -20,4 +29,4 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/app/:path*", "/onboarding/:path*", "/auth/:path*"] };
+export const config = { matcher: ["/", "/app/:path*", "/onboarding/:path*", "/auth/:path*", "/admin/:path*", "/suspendu"] };

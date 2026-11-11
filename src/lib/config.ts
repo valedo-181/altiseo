@@ -14,7 +14,10 @@ export const config = {
 
 export const demoMode = !config.supabase;
 
-/** Adresse publique de l'application (liens de connexion par e-mail). */
-export function siteOrigin(fallback?: string): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? fallback ?? "http://localhost:3000").replace(/\/$/, "");
+/**
+ * Adresse publique de l'application (liens de connexion par e-mail). On prend d'abord l'adresse sur
+ * laquelle la personne se trouve (toujours juste), puis NEXT_PUBLIC_SITE_URL si elle manque.
+ */
+export function siteOrigin(current?: string): string {
+  return (current || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").trim().replace(/\/+$/, "");
 }

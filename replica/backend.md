@@ -86,6 +86,11 @@
 
 ## À faire
 
+- [ ] **Brancher le vrai Google (Search Console).** En attente. Google Cloud : projet, activer
+      « Google Search Console API », écran de consentement OAuth, ID client « Application Web » avec la
+      redirection `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback`. Vercel :
+      `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY`, puis redéployer. Ensuite : tester la
+      première connexion réelle, et demander la validation de Google avant d'ouvrir au public.
 - [ ] **Resend (e-mails).** En attente du choix de l'adresse d'expédition : `titanor.app` (déjà vérifié,
       provisoire), `domevia.ch` ou un domaine Altiseo (3 lignes DNS à poser). Ensuite :
       1. Supabase → Authentication → Emails → SMTP Settings : hôte `smtp.resend.com`, port 465,

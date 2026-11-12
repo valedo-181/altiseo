@@ -172,3 +172,18 @@ export type AiCheck = {
 };
 export type AiPlan = { maxQuestions: number; engines: AiEngineName[] };
 export type AiDueSite = { workspaceId: string; siteId: string; maxQuestions: number; engines: AiEngineName[] };
+
+// Gardien du site (supabase/migrations/20261116000000_gardien.sql) ------------------------------
+export type SiteMonitor = {
+  siteId: string; enabled: boolean; status: "unknown" | "up" | "down"; fails: number;
+  lastCheckedAt: string | null; lastStatusCode: number | null; lastMs: number | null; lastError: string | null; downSince: string | null;
+  sslExpiresAt: string | null; sslCheckedAt: string | null;
+  domainExpiresOn: string | null; domainSource: "rdap" | "manual" | null; domainCheckedAt: string | null;
+  alertEmails: string[]; alertsSent: { ssl?: { until?: string; threshold?: number }; domain?: { until?: string; threshold?: number } };
+};
+export type MonitorDay = { day: string; checks: number; failures: number; totalMs: number };
+export type MonitorIncident = { id: string; siteId: string; startedAt: string; endedAt: string | null; statusCode: number | null; error: string | null };
+export type MonitorDue = {
+  workspaceId: string; siteId: string; url: string; siteName: string; status: SiteMonitor["status"]; fails: number;
+  sslCheckedAt: string | null; domainCheckedAt: string | null; domainSource: SiteMonitor["domainSource"]; emails: string[];
+};

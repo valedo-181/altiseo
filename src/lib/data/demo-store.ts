@@ -2,7 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import { AI_PLANS, weekOf } from "@/lib/geo/analyze";
 import { localDate } from "@/lib/domain/dates";
 
@@ -31,9 +31,12 @@ type Doc = {
   aiQuestions: AiQuestion[];
   aiRuns: AiRun[];
   aiChecks: AiCheck[];
+  monitors: SiteMonitor[];
+  monitorDays: Array<MonitorDay & { siteId: string }>;
+  incidents: MonitorIncident[];
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import type { DueTopic } from "@/lib/jobs/select";
@@ -86,6 +89,11 @@ function write<T>(fn: (d: Doc) => T): Promise<T> {
 }
 
 const now = () => new Date().toISOString();
+
+const newMonitor = (siteId: string): SiteMonitor => ({
+  siteId, enabled: true, status: "unknown", fails: 0, lastCheckedAt: null, lastStatusCode: null, lastMs: null, lastError: null, downSince: null,
+  sslExpiresAt: null, sslCheckedAt: null, domainExpiresOn: null, domainSource: null, domainCheckedAt: null, alertEmails: [], alertsSent: {},
+});
 
 /** Lundi de la semaine, à Zurich (comme la base). */
 const mondayOf = (at: Date) => weekOf(localDate(at, "Europe/Zurich"));
@@ -480,6 +488,74 @@ export const demoDb = {
         if (!live || !plan || !d.aiQuestions.some((q) => q.siteId === site.id)) continue;
         if (d.aiRuns.some((r) => r.siteId === site.id && r.week === week && r.status !== "running")) continue;
         out.push({ workspaceId: site.workspaceId, siteId: site.id, maxQuestions: plan.maxQuestions, engines: [...plan.engines] });
+      }
+      return out;
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Gardien du site
+  // -------------------------------------------------------------------------
+
+  async monitorOf(workspaceId: string, siteId: string): Promise<SiteMonitor> {
+    const found = await read((d) => { siteOf(d, siteId, workspaceId); return d.monitors.find((m) => m.siteId === siteId) ?? null; });
+    if (found) return found;
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const m = d.monitors.find((x) => x.siteId === siteId) ?? newMonitor(siteId);
+      if (!d.monitors.includes(m)) d.monitors.push(m);
+      return m;
+    });
+  },
+  async saveMonitor(workspaceId: string, siteId: string, patch: Partial<Omit<SiteMonitor, "siteId">>) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let m = d.monitors.find((x) => x.siteId === siteId);
+      if (!m) { m = newMonitor(siteId); d.monitors.push(m); }
+      for (const [k, v] of Object.entries(patch)) if (v !== undefined) (m as Record<string, unknown>)[k] = v;
+    });
+  },
+  async addMonitorDay(workspaceId: string, siteId: string, day: string, failed: boolean, ms: number) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let row = d.monitorDays.find((x) => x.siteId === siteId && x.day === day);
+      if (!row) { row = { siteId, day, checks: 0, failures: 0, totalMs: 0 }; d.monitorDays.push(row); }
+      row.checks++;
+      if (failed) row.failures++;
+      row.totalMs += Math.max(0, Math.round(ms));
+    });
+  },
+  async monitorDays(workspaceId: string, siteId: string, since: string): Promise<MonitorDay[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.monitorDays.filter((x) => x.siteId === siteId && x.day >= since).sort((a, b) => a.day.localeCompare(b.day)).map(({ siteId: _s, ...x }) => x); });
+  },
+  async monitorIncidents(workspaceId: string, siteId: string, limit = 10): Promise<MonitorIncident[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.incidents.filter((x) => x.siteId === siteId).sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, limit); });
+  },
+  async openIncident(workspaceId: string, siteId: string, i: { startedAt: string; statusCode: number | null; error: string | null }) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      if (d.incidents.some((x) => x.siteId === siteId && !x.endedAt)) return;
+      d.incidents.push({ id: randomUUID(), siteId, startedAt: i.startedAt, endedAt: null, statusCode: i.statusCode, error: i.error });
+    });
+  },
+  async closeIncident(workspaceId: string, siteId: string, endedAt: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      for (const x of d.incidents) if (x.siteId === siteId && !x.endedAt) x.endedAt = endedAt;
+    });
+  },
+  async monitorDue(): Promise<MonitorDue[]> {
+    return read((d) => {
+      const out: MonitorDue[] = [];
+      const limit = Date.now() - 4 * 60_000;
+      for (const site of d.sites) {
+        const sub = d.subscriptions.find((x) => x.workspaceId === site.workspaceId);
+        const live = sub && (sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now())));
+        if (!live || site.onboardingStep < 8) continue;
+        const m = d.monitors.find((x) => x.siteId === site.id) ?? newMonitor(site.id);
+        if (!m.enabled || (m.lastCheckedAt && new Date(m.lastCheckedAt).getTime() > limit)) continue;
+        const owners = d.memberships.filter((x) => x.workspaceId === site.workspaceId && x.role !== "member").map((x) => d.users.find((u) => u.id === x.userId)?.email).filter(Boolean) as string[];
+        out.push({ workspaceId: site.workspaceId, siteId: site.id, url: site.url, siteName: site.name || site.url, status: m.status, fails: m.fails, sslCheckedAt: m.sslCheckedAt, domainCheckedAt: m.domainCheckedAt, domainSource: m.domainSource, emails: m.alertEmails.length ? m.alertEmails : owners.slice(0, 3) });
       }
       return out;
     });

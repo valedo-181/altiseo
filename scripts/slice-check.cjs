@@ -195,6 +195,25 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   await page.waitForFunction((n) => document.querySelectorAll("button").length && [...document.querySelectorAll("button")].filter((b) => b.textContent === "Retirer").length === n - 1, nQ);
   assert(true, "question retirée");
 
+  console.log("S26 gardien du site");
+  await page.goto(BASE + "/app/gardien");
+  await page.getByRole("heading", { name: "Gardien du site" }).waitFor();
+  await page.getByText("Pas encore vérifié").waitFor();
+  await page.getByLabel("Adresses qui reçoivent les alertes").fill("pas-une-adresse");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await page.getByText("Cette adresse n'est pas valide : pas-une-adresse").waitFor();
+  assert(true, "adresse d'alerte invalide refusée");
+  await page.getByLabel("Adresses qui reçoivent les alertes").fill("alertes@exemple.ch");
+  await page.getByLabel("Échéance du nom de domaine").fill("2027-03-14");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await page.getByText("Réglages du gardien enregistrés.").waitFor();
+  await page.getByText("Jusqu'au 14 mars 2027").waitFor();
+  assert(true, "échéance du domaine saisie à la main");
+  await page.getByRole("button", { name: "Vérifier maintenant" }).click();
+  await page.getByText("Dernière vérification").waitFor({ timeout: 20000 });
+  assert(true, "vérification à la demande");
+  await shot("S26");
+
   console.log("Sécurité : un autre compte ne voit rien");
   const other = await browser.newContext();
   const p2 = await other.newPage();
@@ -213,7 +232,7 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const pm = await mob.newPage();
   pm.on("pageerror", (e) => errors.push("mobile: " + e.message));
-  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia"]) {
+  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia", "/app/gardien"]) {
     await pm.goto(BASE + path);
     const w = await pm.evaluate(() => document.documentElement.scrollWidth);
     assert(w <= 390, `${path} sans défilement horizontal à 390 px (${w})`);

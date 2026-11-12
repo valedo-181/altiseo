@@ -1,4 +1,4 @@
-import { Bot, CalendarDays, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
+import { Bot, CalendarDays, ShieldCheck, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
 
 /** Menu de l'application (partagé par le serveur et le navigateur). */
 export const NAV = [
@@ -8,6 +8,7 @@ export const NAV = [
   { href: "/app/mots-cles", label: "Mots-clés", Icon: LineChart },
   { href: "/app/visibilite-ia", label: "Visibilité IA", Icon: Bot },
   { href: "/app/audit", label: "Audit", Icon: Gauge },
+  { href: "/app/gardien", label: "Gardien du site", Icon: ShieldCheck },
   { href: "/app/integrations", label: "Intégrations", Icon: Plug },
   { href: "/app/reglages", label: "Réglages", Icon: Settings },
 ] as const;

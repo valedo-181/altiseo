@@ -2,7 +2,7 @@ import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
 import { supabaseUrl } from "@/lib/supabase/url";
-import type { AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import type { DueTopic } from "@/lib/jobs/select";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
@@ -100,6 +100,20 @@ const toAiCheck = (r: Row): AiCheck => ({
   id: s(r.id), siteId: s(r.site_id), questionId: s(r.question_id), engine: r.engine as AiEngineName, week: s(r.week), status: r.status === "error" ? "error" : "ok",
   cited: Boolean(r.cited), position: (r.position as number) ?? null, linked: Boolean(r.linked), competitors: (r.competitors as AiCheck["competitors"]) ?? [],
   sources: (r.sources as string[]) ?? [], excerpt: (r.excerpt as string) ?? null, error: (r.error as string) ?? null, demo: Boolean(r.demo), checkedAt: s(r.checked_at),
+});
+
+const MONITOR_COLS: Record<string, string> = {
+  enabled: "enabled", status: "status", fails: "fails", lastCheckedAt: "last_checked_at", lastStatusCode: "last_status_code", lastMs: "last_ms",
+  lastError: "last_error", downSince: "down_since", sslExpiresAt: "ssl_expires_at", sslCheckedAt: "ssl_checked_at", domainExpiresOn: "domain_expires_on",
+  domainSource: "domain_source", domainCheckedAt: "domain_checked_at", alertEmails: "alert_emails", alertsSent: "alerts_sent",
+};
+const toMonitor = (r: Row): SiteMonitor => ({
+  siteId: s(r.site_id), enabled: r.enabled !== false, status: (r.status as SiteMonitor["status"]) ?? "unknown", fails: Number(r.fails ?? 0),
+  lastCheckedAt: (r.last_checked_at as string) ?? null, lastStatusCode: (r.last_status_code as number) ?? null, lastMs: (r.last_ms as number) ?? null,
+  lastError: (r.last_error as string) ?? null, downSince: (r.down_since as string) ?? null, sslExpiresAt: (r.ssl_expires_at as string) ?? null,
+  sslCheckedAt: (r.ssl_checked_at as string) ?? null, domainExpiresOn: (r.domain_expires_on as string) ?? null,
+  domainSource: (r.domain_source as SiteMonitor["domainSource"]) ?? null, domainCheckedAt: (r.domain_checked_at as string) ?? null,
+  alertEmails: (r.alert_emails as string[]) ?? [], alertsSent: (r.alerts_sent as SiteMonitor["alertsSent"]) ?? {},
 });
 
 /** Le site existe, appartient à l'espace, et la personne connectée y a accès (RLS). */
@@ -446,6 +460,53 @@ export const supabaseDb = {
   async aiVisibilityDue(): Promise<AiDueSite[]> {
     return ((check(await adminClient().rpc("ai_visibility_due")) as Row[] | null) ?? []).map((r) => ({
       workspaceId: s(r.workspace_id), siteId: s(r.site_id), maxQuestions: Number(r.max_questions), engines: (r.engines as AiEngineName[]) ?? [],
+    }));
+  },
+
+  // Gardien du site -------------------------------------------------------------
+  async monitorOf(workspaceId: string, siteId: string): Promise<SiteMonitor> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const r = check(await sb.from("site_monitors").select("*").eq("site_id", siteId).maybeSingle()) as Row | null;
+    if (r) return toMonitor(r);
+    // Site créé avant le gardien et oublié par la migration : on le crée maintenant.
+    return toMonitor(one(await adminClient().from("site_monitors").upsert({ site_id: siteId, workspace_id: workspaceId }, { onConflict: "site_id" }).select("*").single()));
+  },
+  async saveMonitor(workspaceId: string, siteId: string, patch: Partial<Omit<SiteMonitor, "siteId">>) {
+    await siteOf(workspaceId, siteId);
+    const row: Row = {};
+    for (const [k, v] of Object.entries(patch)) if (MONITOR_COLS[k] && v !== undefined) row[MONITOR_COLS[k]] = v;
+    if (Object.keys(row).length) check(await adminClient().from("site_monitors").update(row).eq("site_id", siteId).eq("workspace_id", workspaceId));
+  },
+  async addMonitorDay(workspaceId: string, siteId: string, day: string, failed: boolean, ms: number) {
+    check(await adminClient().rpc("monitor_add_day", { p_site: siteId, p_workspace: workspaceId, p_day: day, p_failed: failed, p_ms: Math.round(ms) }));
+  },
+  async monitorDays(workspaceId: string, siteId: string, since: string): Promise<MonitorDay[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("monitor_days").select("*").eq("site_id", siteId).gte("day", since).order("day")) as Row[] | null) ?? [])
+      .map((r) => ({ day: s(r.day), checks: Number(r.checks), failures: Number(r.failures), totalMs: Number(r.total_ms) }));
+  },
+  async monitorIncidents(workspaceId: string, siteId: string, limit = 10): Promise<MonitorIncident[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("monitor_incidents").select("*").eq("site_id", siteId).order("started_at", { ascending: false }).limit(limit)) as Row[] | null) ?? [])
+      .map((r) => ({ id: s(r.id), siteId: s(r.site_id), startedAt: s(r.started_at), endedAt: (r.ended_at as string) ?? null, statusCode: (r.status_code as number) ?? null, error: (r.error as string) ?? null }));
+  },
+  async openIncident(workspaceId: string, siteId: string, i: { startedAt: string; statusCode: number | null; error: string | null }) {
+    await siteOf(workspaceId, siteId);
+    const r = await adminClient().from("monitor_incidents").insert({ site_id: siteId, workspace_id: workspaceId, started_at: i.startedAt, status_code: i.statusCode, error: i.error?.slice(0, 300) ?? null });
+    if (r.error?.code !== "23505") check(r); // déjà ouverte : rien à faire
+  },
+  async closeIncident(workspaceId: string, siteId: string, endedAt: string) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("monitor_incidents").update({ ended_at: endedAt }).eq("site_id", siteId).eq("workspace_id", workspaceId).is("ended_at", null));
+  },
+  async monitorDue(): Promise<MonitorDue[]> {
+    return ((check(await adminClient().rpc("monitor_due")) as Row[] | null) ?? []).map((r) => ({
+      workspaceId: s(r.workspace_id), siteId: s(r.site_id), url: s(r.url), siteName: s(r.site_name), status: (r.status as SiteMonitor["status"]) ?? "unknown",
+      fails: Number(r.fails ?? 0), sslCheckedAt: (r.ssl_checked_at as string) ?? null, domainCheckedAt: (r.domain_checked_at as string) ?? null,
+      domainSource: (r.domain_source as SiteMonitor["domainSource"]) ?? null, emails: (r.emails as string[]) ?? [],
     }));
   },
 

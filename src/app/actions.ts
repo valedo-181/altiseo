@@ -7,6 +7,7 @@ import { config, siteOrigin } from "@/lib/config";
 import { userClient } from "@/lib/supabase/server";
 import * as svc from "@/lib/app/service";
 import * as geo from "@/lib/app/geo";
+import * as gardien from "@/lib/app/monitor";
 import { endSession, rememberSite, startSession } from "@/lib/app/session";
 import { db, Conflict } from "@/lib/data/store";
 import { INSTRUCTIONS_MAX, type Lang } from "@/lib/domain/types";
@@ -363,6 +364,25 @@ export async function runAiVisibility(_s?: FormState, _f?: FormData): Promise<Fo
   const v = r.value;
   if (v.remaining) return { ok: `${v.asked} réponses lues. Il en reste ${v.remaining} : relancez, ou elles seront lues au prochain passage automatique.` };
   return { ok: v.errors ? `Terminé : ${v.asked} réponses, dont ${v.errors} en erreur.` : `Terminé : ${v.asked} réponses lues.` };
+}
+
+// ---------------------------------------------------------------------------
+// Gardien du site
+// ---------------------------------------------------------------------------
+
+export async function checkSiteNow(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await gardien.checkNow(workspace.id, site.id);
+  revalidatePath("/app/gardien");
+  if (!r.ok) return { error: r.error };
+  return r.value.status === "down" ? { error: "Le site ne répond toujours pas." } : r.value.lastError ? { error: `Vérification faite : ${r.value.lastError}. Nouvel essai dans 5 minutes avant de parler de panne.` } : { ok: `Le site répond (${r.value.lastMs ?? "?"} ms).` };
+}
+
+export async function saveMonitorSettings(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await gardien.saveMonitorSettings(workspace.id, site.id, { enabled: f.get("enabled") === "on", emails: str(f, "emails"), domainExpiresOn: str(f, "domain") });
+  revalidatePath("/app/gardien");
+  return r.ok ? { ok: "Réglages du gardien enregistrés." } : { error: r.error };
 }
 
 // ---------------------------------------------------------------------------

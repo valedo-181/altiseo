@@ -87,20 +87,24 @@
 
 ## À faire
 
-- [ ] **Brancher Higgsfield (images des articles).** En attente : créer une clé API dans la console Higgsfield,
-      recharger le solde API (à part de l'abonnement), mettre `HIGGSFIELD_KEY_ID` et `HIGGSFIELD_KEY_SECRET` dans
-      Vercel, redéployer, puis faire un premier essai réel (jamais testé contre la vraie API).
 - [x] **Activer la publication automatique.** `CRON_SECRET` en place ; passage lancé à la main le 11.11.2026 :
       secret accepté, `due: 0` (aucun sujet dû). Premier article automatique attendu le 14.11.2026 : à vérifier.
 - [ ] **Migrer la tâche vers « Schedules » de Vercel.** Les Cron Jobs de `vercel.json` sont marqués « Legacy »
       dans Vercel (ils fonctionnent encore). Lire la documentation de migration de Vercel avant de changer.
-- [ ] **Brancher le vrai Google (Search Console).** En attente (site : domevia.ch, à valider dans Search Console).
-      Google Cloud : projet, activer « Google Search Console API », écran de consentement OAuth (externe, adresse
-      du propriétaire en utilisateur test), ID client « Application Web » avec la redirection
-      `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback`. Vercel : `GOOGLE_CLIENT_ID`,
+- [ ] **Brancher le vrai Google (Search Console).** En attente. Fait : domevia.ch est dans Search Console (12.11.2026).
+      Reste, côté Google Cloud : projet, activer « Google Search Console API », écran de consentement OAuth (externe,
+      adresse du propriétaire en utilisateur test), ID client « Application Web » avec les deux redirections
+      `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback` et
+      `https://www.altiseo.ch/app/mots-cles/google/callback`. Côté Vercel : `GOOGLE_CLIENT_ID`,
       `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY` (`openssl rand -base64 32`, à ne plus changer ensuite ; elle active
-      aussi l'envoi réel à WordPress), puis redéployer. Ensuite : tester la première connexion réelle, et demander
-      la validation de Google avant d'ouvrir au public (page de confidentialité requise).
+      aussi l'envoi réel à WordPress), puis redéployer. Ensuite : « Connecter mon compte Google » (première connexion
+      réelle jamais testée), et validation de Google avant d'ouvrir au public (page de confidentialité requise).
+- [ ] **Finir le passage au domaine www.altiseo.ch.** Domaine déclaré dans Vercel (www principal, le domaine seul
+      redirige). DNS chez Infomaniak : `A @ 216.150.1.1` et `CNAME www` vers la valeur donnée par Vercel, après avoir
+      retiré les entrées A / AAAA / CNAME par défaut. Une fois « Valid Configuration » : `NEXT_PUBLIC_SITE_URL` dans
+      Vercel, adresse du site et adresses de retour dans Supabase (sinon les liens de connexion échouent sur le
+      nouveau domaine), redirection Google, domaine d'expédition Resend.
+- [x] **Brancher Higgsfield (images des articles).** Première image réelle créée et rangée le 12.11.2026.
 - [ ] **Resend (e-mails).** En attente du choix de l'adresse d'expédition : `titanor.app` (déjà vérifié,
       provisoire), `domevia.ch` ou un domaine Altiseo (3 lignes DNS à poser). Ensuite :
       1. Supabase → Authentication → Emails → SMTP Settings : hôte `smtp.resend.com`, port 465,

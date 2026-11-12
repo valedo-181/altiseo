@@ -94,11 +94,13 @@
       secret accepté, `due: 0` (aucun sujet dû). Premier article automatique attendu le 14.11.2026 : à vérifier.
 - [ ] **Migrer la tâche vers « Schedules » de Vercel.** Les Cron Jobs de `vercel.json` sont marqués « Legacy »
       dans Vercel (ils fonctionnent encore). Lire la documentation de migration de Vercel avant de changer.
-- [ ] **Brancher le vrai Google (Search Console).** En attente. Google Cloud : projet, activer
-      « Google Search Console API », écran de consentement OAuth, ID client « Application Web » avec la
-      redirection `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback`. Vercel :
-      `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY`, puis redéployer. Ensuite : tester la
-      première connexion réelle, et demander la validation de Google avant d'ouvrir au public.
+- [ ] **Brancher le vrai Google (Search Console).** En attente (site : domevia.ch, à valider dans Search Console).
+      Google Cloud : projet, activer « Google Search Console API », écran de consentement OAuth (externe, adresse
+      du propriétaire en utilisateur test), ID client « Application Web » avec la redirection
+      `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback`. Vercel : `GOOGLE_CLIENT_ID`,
+      `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY` (`openssl rand -base64 32`, à ne plus changer ensuite ; elle active
+      aussi l'envoi réel à WordPress), puis redéployer. Ensuite : tester la première connexion réelle, et demander
+      la validation de Google avant d'ouvrir au public (page de confidentialité requise).
 - [ ] **Resend (e-mails).** En attente du choix de l'adresse d'expédition : `titanor.app` (déjà vérifié,
       provisoire), `domevia.ch` ou un domaine Altiseo (3 lignes DNS à poser). Ensuite :
       1. Supabase → Authentication → Emails → SMTP Settings : hôte `smtp.resend.com`, port 465,

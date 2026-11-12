@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildImagePrompt, imageAlt, isOwnImage, IMAGE_STYLE } from "./prompt.ts";
+import { buildImagePrompt, imageAlt, isLegacyImagePrompt, isOwnImage, IMAGE_STYLE } from "./prompt.ts";
 import { findImageUrl, generateImage, higgsfieldKey } from "./higgsfield.ts";
 
 test("la demande d'image impose la photo réaliste, sans texte ni visage", () => {
@@ -8,7 +8,12 @@ test("la demande d'image impose la photo réaliste, sans texte ni visage", () =>
   assert.ok(p.startsWith("Stacked moving boxes in a bright empty living room. Realistic editorial photograph"));
   assert.ok(p.endsWith(IMAGE_STYLE));
   const q = buildImagePrompt({ title: "Garde-meubles : <b>quelle</b> taille ?", theme: "déménagement", keyword: "garde-meubles" });
-  assert.match(q, /A scene illustrating "Garde-meubles : b quelle \/b taille \?", in the field of déménagement \(garde-meubles\)\./);
+  assert.ok(q.startsWith("A realistic everyday scene about garde-meubles, déménagement, shown only through concrete objects"), q);
+  assert.ok(!q.includes("Garde-meubles :") && !q.includes("taille"), "le titre ne doit jamais entrer dans la demande");
+  assert.ok(!/["«»“”]/.test(buildImagePrompt({ idea: 'A box labelled "Fragile" on a parquet floor.', title: "T", theme: "" })), "pas de guillemets");
+  assert.ok(buildImagePrompt({ title: "T", theme: "" }).startsWith("A realistic everyday scene about home life"));
+  assert.ok(isLegacyImagePrompt('A scene illustrating "État des lieux", in the field of x.'));
+  assert.ok(!isLegacyImagePrompt(p) && !isLegacyImagePrompt(null));
   assert.equal(imageAlt("  Déménager\nen hiver  "), "Déménager en hiver");
 });
 

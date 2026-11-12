@@ -15,7 +15,7 @@ import { alternativeDemoTopic, planDemoTopics } from "@/lib/domain/plan";
 import { slugify, uniqueSlug } from "@/lib/domain/slug";
 import { MAX_REGENERATIONS, type Article, type Integration, type Site } from "@/lib/domain/types";
 import { generateImage } from "@/lib/images/higgsfield";
-import { buildImagePrompt, imageAlt, isOwnImage, MAX_IMAGE_GENERATIONS } from "@/lib/images/prompt";
+import { buildImagePrompt, imageAlt, isLegacyImagePrompt, isOwnImage, MAX_IMAGE_GENERATIONS } from "@/lib/images/prompt";
 import { supabaseUrl } from "@/lib/supabase/url";
 import { dailyQueries, dailyTotals, exchangeCode, listProperties, refreshAccess, revokeToken } from "@/lib/search/google";
 import { buildReport, CHART_DAYS, matchProperty, PERIOD_DAYS, sampleRows } from "@/lib/search/report";
@@ -302,7 +302,8 @@ export async function illustrateArticle(workspaceId: string, articleId: string, 
     return { ok: true, value: { demo: true } };
   }
   // Une nouvelle demande repart de la même scène ; Higgsfield en donne une autre vue à chaque fois.
-  const prompt = a.imagePrompt && !opts.idea ? a.imagePrompt : buildImagePrompt({ idea: opts.idea, title: a.title, theme: site.theme, keyword: a.keywords[0] });
+  // Sauf une demande de l'ancienne version (titre entre guillemets, écrit ensuite sur la photo) : on la refait.
+  const prompt = a.imagePrompt && !opts.idea && !isLegacyImagePrompt(a.imagePrompt) ? a.imagePrompt : buildImagePrompt({ idea: opts.idea, title: a.title, theme: site.theme, keyword: a.keywords[0] });
   const img = await generateImage(prompt, {
     keyId: process.env.HIGGSFIELD_KEY_ID ?? "", keySecret: process.env.HIGGSFIELD_KEY_SECRET ?? "",
     model: process.env.HIGGSFIELD_IMAGE_MODEL?.trim(), resolution: process.env.HIGGSFIELD_IMAGE_RESOLUTION?.trim(),

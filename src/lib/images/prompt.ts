@@ -3,15 +3,27 @@
  * visage reconnaissable (pas de faute d'orthographe générée, pas de faux « employé »).
  * Fonctions pures, testées dans images.test.ts.
  */
-export const IMAGE_STYLE = "Realistic editorial photograph, natural light, shallow depth of field, landscape 16:9. No text, no letters, no numbers, no signage, no logos, no brand names, no watermark. No recognizable faces: people only from behind, at a distance or hands only.";
+export const IMAGE_STYLE = "Realistic editorial photograph, natural light, shallow depth of field, landscape 16:9. No text, no letters, no numbers, no signage, no logos, no brand names, no watermark: any paper, screen, box or sign in the scene is blank. No recognizable faces: people only from behind, at a distance or hands only.";
 export const MAX_IMAGE_GENERATIONS = 5;
 const clean = (s: string, max: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
-/** `idea` : la scène proposée à la rédaction (peut manquer) ; sinon on part du titre et du thème. */
+/** Guillemets retirés : un mot entre guillemets est lu par le modèle comme un texte à écrire dans l'image. */
+const unquote = (s: string) => s.replace(/["'`«»“”„‘’‹›]/g, " ");
+
+/**
+ * `idea` : la scène proposée à la rédaction (peut manquer). Sinon on décrit le sujet par le mot-clé
+ * et le thème, jamais par le titre : un titre dans la demande finit écrit sur la photo (et mal orthographié).
+ */
 export function buildImagePrompt(a: { idea?: string | null; title: string; theme: string; keyword?: string }): string {
-  const idea = clean(a.idea ?? "", 400);
-  const subject = idea || `A scene illustrating "${clean(a.title, 160)}"${a.theme ? `, in the field of ${clean(a.theme, 60)}` : ""}${a.keyword ? ` (${clean(a.keyword, 80)})` : ""}`;
+  const idea = clean(unquote(a.idea ?? ""), 400);
+  const topic = [a.keyword, a.theme].map((x) => clean(unquote(x ?? ""), 80)).filter(Boolean).join(", ");
+  const subject = idea || `A realistic everyday scene about ${topic || "home life"}, shown only through concrete objects, places and actions, never through written words`;
   return `${subject.replace(/[.\s]+$/, "")}. ${IMAGE_STYLE}`;
+}
+
+/** Demande enregistrée par l'ancienne version (titre entre guillemets) : à refaire plutôt qu'à réutiliser. */
+export function isLegacyImagePrompt(prompt: string | null | undefined): boolean {
+  return Boolean(prompt && /^A scene illustrating "/.test(prompt));
 }
 
 /** Texte de remplacement (lecteurs d'écran, Google Images) : court, sans « image de ». */

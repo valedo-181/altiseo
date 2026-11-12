@@ -15,9 +15,9 @@ export const metadata: Metadata = { alternates: { canonical: "/tarifs" },
 /** S02 : prix provisoires (supabase/migrations) ; à fixer avec /replica-launch. */
 const PLANS: Plan[] = [
   { code: "grow", name: "Grow", tagline: "Pour faire vivre le blog d'un site.", month: 99, year: 891, best: true,
-    items: ["30 articles par mois", "1 site", "1 langue", "Calendrier de 30 sujets", "Audit SEO technique", "Envoi sur WordPress"] },
+    items: ["30 articles par mois", "1 site", "1 langue", "Calendrier de 30 sujets", "Audit SEO technique", "Visibilité IA : 10 questions (ChatGPT, Perplexity)", "Positions Google : 50 mots-clés", "Envoi sur WordPress"] },
   { code: "scale", name: "Scale", tagline: "Pour plusieurs sites ou plusieurs langues.", month: 249, year: 2241, best: false,
-    items: ["60 articles par mois", "3 sites", "4 langues", "Calendrier de 30 sujets par site", "Audit SEO technique", "Envoi sur WordPress"] },
+    items: ["60 articles par mois", "3 sites", "4 langues", "Calendrier de 30 sujets par site", "Audit SEO technique", "Visibilité IA : 30 questions par site (4 IA)", "Positions Google : 200 mots-clés par site", "Envoi sur WordPress"] },
 ];
 
 const ROWS: [string, string | boolean, string | boolean][] = [
@@ -25,6 +25,11 @@ const ROWS: [string, string | boolean, string | boolean][] = [
   ["Sites", "1", "3"],
   ["Langues (français, allemand, italien, anglais)", "1", "4"],
   ["Calendrier de sujets à valider", true, true],
+  ["Visibilité IA : questions suivies chaque semaine", "10", "30 par site"],
+  ["IA interrogées", "ChatGPT, Perplexity", "ChatGPT, Gemini, Perplexity, Claude"],
+  ["Positions Google : mots-clés suivis chaque semaine", "50", "200 par site"],
+  ["Indexation : état Google des pages + IndexNow (Bing…)", true, true],
+  ["Gardien du site : pannes, certificat SSL, nom de domaine", true, true],
   ["Vos consignes de ton appliquées à chaque article", true, true],
   ["Relecture et correction avant publication", true, true],
   ["Envoi sur WordPress, en brouillon ou publié", true, true],

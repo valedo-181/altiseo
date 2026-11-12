@@ -2,7 +2,10 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import { AI_PLANS, weekOf } from "@/lib/geo/analyze";
+import { RANK_PLANS } from "@/lib/rank/serp";
+import { localDate } from "@/lib/domain/dates";
 
 /**
  * Couche de données en MODE DÉMO : un fichier JSON local (.data/demo.json), un seul processus.
@@ -26,9 +29,20 @@ type Doc = {
   publications: Publication[];
   audits: AuditRun[];
   search: Array<SearchConnection & { report: SearchReport | null }>;
+  aiQuestions: AiQuestion[];
+  aiRuns: AiRun[];
+  aiChecks: AiCheck[];
+  monitors: SiteMonitor[];
+  monitorDays: Array<MonitorDay & { siteId: string }>;
+  incidents: MonitorIncident[];
+  rankKeywords: RankKeyword[];
+  rankChecks: RankCheck[];
+  indexing: SiteIndexing[];
+  submissions: IndexNowSubmission[];
+  inspections: UrlInspection[];
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import type { DueTopic } from "@/lib/jobs/select";
@@ -81,6 +95,14 @@ function write<T>(fn: (d: Doc) => T): Promise<T> {
 }
 
 const now = () => new Date().toISOString();
+
+const newMonitor = (siteId: string): SiteMonitor => ({
+  siteId, enabled: true, status: "unknown", fails: 0, lastCheckedAt: null, lastStatusCode: null, lastMs: null, lastError: null, downSince: null,
+  sslExpiresAt: null, sslCheckedAt: null, domainExpiresOn: null, domainSource: null, domainCheckedAt: null, alertEmails: [], alertsSent: {},
+});
+
+/** Lundi de la semaine, à Zurich (comme la base). */
+const mondayOf = (at: Date) => weekOf(localDate(at, "Europe/Zurich"));
 
 function siteOf(d: Doc, siteId: string, workspaceId: string): Site {
   const s = d.sites.find((x) => x.id === siteId);
@@ -387,6 +409,265 @@ export const demoDb = {
     await write((d) => {
       siteOf(d, siteId, workspaceId);
       d.search = d.search.filter((x) => x.siteId !== siteId);
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Visibilité IA
+  // -------------------------------------------------------------------------
+
+  async aiPlan(workspaceId: string): Promise<AiPlan> {
+    return read((d) => {
+      const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId);
+      const p = sub ? AI_PLANS[sub.planCode] : null;
+      return p ? { maxQuestions: p.maxQuestions, engines: [...p.engines] } : { maxQuestions: 0, engines: [] };
+    });
+  },
+  async listAiQuestions(workspaceId: string, siteId: string): Promise<AiQuestion[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.aiQuestions.filter((q) => q.siteId === siteId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); });
+  },
+  async addAiQuestions(workspaceId: string, siteId: string, items: Array<{ question: string; source: AiQuestion["source"] }>): Promise<number> {
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId);
+      if (!sub) throw new QuotaReached();
+      const max = AI_PLANS[sub.planCode]?.maxQuestions ?? 0;
+      let n = 0;
+      for (const it of items) {
+        const mine = d.aiQuestions.filter((q) => q.siteId === siteId);
+        if (mine.some((q) => q.question === it.question)) continue;
+        if (mine.length >= max) break;
+        d.aiQuestions.push({ id: randomUUID(), siteId, question: it.question, source: it.source, createdAt: new Date(Date.now() + n).toISOString() });
+        n++;
+      }
+      return n;
+    });
+  },
+  async removeAiQuestion(workspaceId: string, siteId: string, questionId: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.aiQuestions = d.aiQuestions.filter((q) => !(q.id === questionId && q.siteId === siteId));
+      d.aiChecks = d.aiChecks.filter((c) => c.questionId !== questionId);
+    });
+  },
+  async listAiRuns(workspaceId: string, siteId: string, limit = 8): Promise<AiRun[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.aiRuns.filter((r) => r.siteId === siteId).sort((a, b) => b.week.localeCompare(a.week)).slice(0, limit); });
+  },
+  async claimAiRun(workspaceId: string, siteId: string, week: string, demo: boolean): Promise<AiRun | null> {
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const cur = d.aiRuns.find((r) => r.siteId === siteId && r.week === week);
+      if (cur) return cur.status === "running" ? cur : null;
+      const run: AiRun = { id: randomUUID(), siteId, week, status: "running", readiness: null, error: null, demo, startedAt: now(), finishedAt: null };
+      d.aiRuns.push(run);
+      return run;
+    });
+  },
+  async updateAiRun(workspaceId: string, siteId: string, runId: string, patch: Partial<Pick<AiRun, "status" | "readiness" | "error">> & { finished?: boolean }) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const r = d.aiRuns.find((x) => x.id === runId && x.siteId === siteId);
+      if (!r) return;
+      const { finished, ...rest } = patch;
+      Object.assign(r, rest, finished ? { finishedAt: now() } : {});
+    });
+  },
+  async listAiChecks(workspaceId: string, siteId: string, weeks: string[]): Promise<AiCheck[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.aiChecks.filter((c) => c.siteId === siteId && weeks.includes(c.week)); });
+  },
+  async saveAiCheck(workspaceId: string, siteId: string, c: Omit<AiCheck, "id" | "siteId" | "checkedAt">) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.aiChecks = d.aiChecks.filter((x) => !(x.questionId === c.questionId && x.engine === c.engine && x.week === c.week));
+      d.aiChecks.push({ ...c, id: randomUUID(), siteId, checkedAt: now() });
+    });
+  },
+  async aiVisibilityDue(): Promise<AiDueSite[]> {
+    return read((d) => {
+      const week = mondayOf(new Date());
+      const out: AiDueSite[] = [];
+      for (const site of d.sites) {
+        const sub = d.subscriptions.find((x) => x.workspaceId === site.workspaceId);
+        if (!sub || site.onboardingStep < 8) continue;
+        const live = sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now()));
+        const plan = AI_PLANS[sub.planCode];
+        if (!live || !plan || !d.aiQuestions.some((q) => q.siteId === site.id)) continue;
+        if (d.aiRuns.some((r) => r.siteId === site.id && r.week === week && r.status !== "running")) continue;
+        out.push({ workspaceId: site.workspaceId, siteId: site.id, maxQuestions: plan.maxQuestions, engines: [...plan.engines] });
+      }
+      return out;
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Positions Google
+  // -------------------------------------------------------------------------
+
+  async rankPlan(workspaceId: string): Promise<number> {
+    return read((d) => { const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId); return sub ? RANK_PLANS[sub.planCode] ?? 0 : 0; });
+  },
+  async listRankKeywords(workspaceId: string, siteId: string): Promise<RankKeyword[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.rankKeywords.filter((k) => k.siteId === siteId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); });
+  },
+  async addRankKeywords(workspaceId: string, siteId: string, items: Array<{ phrase: string; source: RankKeyword["source"] }>): Promise<number> {
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId);
+      if (!sub) throw new QuotaReached();
+      const max = RANK_PLANS[sub.planCode] ?? 0;
+      let n = 0;
+      for (const it of items) {
+        const mine = d.rankKeywords.filter((k) => k.siteId === siteId);
+        if (mine.some((k) => k.phrase.toLowerCase() === it.phrase.toLowerCase())) continue;
+        if (mine.length >= max) break;
+        d.rankKeywords.push({ id: randomUUID(), siteId, phrase: it.phrase, source: it.source, createdAt: new Date(Date.now() + n).toISOString() });
+        n++;
+      }
+      return n;
+    });
+  },
+  async removeRankKeyword(workspaceId: string, siteId: string, keywordId: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.rankKeywords = d.rankKeywords.filter((k) => !(k.id === keywordId && k.siteId === siteId));
+      d.rankChecks = d.rankChecks.filter((c) => c.keywordId !== keywordId);
+    });
+  },
+  async listRankChecks(workspaceId: string, siteId: string, weeks: string[]): Promise<RankCheck[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.rankChecks.filter((c) => c.siteId === siteId && weeks.includes(c.week)); });
+  },
+  async rankWeeks(workspaceId: string, siteId: string, limit = 12): Promise<string[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return [...new Set(d.rankChecks.filter((c) => c.siteId === siteId).map((c) => c.week))].sort().reverse().slice(0, limit); });
+  },
+  async saveRankCheck(workspaceId: string, siteId: string, c: Omit<RankCheck, "id" | "siteId" | "checkedAt">) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.rankChecks = d.rankChecks.filter((x) => !(x.keywordId === c.keywordId && x.week === c.week));
+      d.rankChecks.push({ ...c, id: randomUUID(), siteId, checkedAt: now() });
+    });
+  },
+  async rankDue(): Promise<RankDue[]> {
+    return read((d) => {
+      const week = mondayOf(new Date());
+      const out: RankDue[] = [];
+      for (const site of d.sites) {
+        const sub = d.subscriptions.find((x) => x.workspaceId === site.workspaceId);
+        if (!sub || site.onboardingStep < 8) continue;
+        const live = sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now()));
+        const max = RANK_PLANS[sub.planCode] ?? 0;
+        const missing = d.rankKeywords.some((k) => k.siteId === site.id && !d.rankChecks.some((c) => c.keywordId === k.id && c.week === week));
+        if (live && max && missing) out.push({ workspaceId: site.workspaceId, siteId: site.id, maxKeywords: max });
+      }
+      return out;
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Indexation (IndexNow + inspection d'URL)
+  // -------------------------------------------------------------------------
+
+  async indexingOf(workspaceId: string, siteId: string): Promise<SiteIndexing> {
+    const found = await read((d) => { siteOf(d, siteId, workspaceId); return d.indexing.find((x) => x.siteId === siteId) ?? null; });
+    if (found) return found;
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let x = d.indexing.find((y) => y.siteId === siteId);
+      if (!x) { x = { siteId, indexnowKey: randomUUID().replace(/-/g, ""), keyVerifiedAt: null, keyError: null, autoSubmit: true }; d.indexing.push(x); }
+      return x;
+    });
+  },
+  async saveIndexing(workspaceId: string, siteId: string, patch: Partial<Pick<SiteIndexing, "keyVerifiedAt" | "keyError" | "autoSubmit">>) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const x = d.indexing.find((y) => y.siteId === siteId);
+      if (x) for (const [k, v] of Object.entries(patch)) if (v !== undefined) (x as Record<string, unknown>)[k] = v;
+    });
+  },
+  async addSubmission(workspaceId: string, siteId: string, x: Omit<IndexNowSubmission, "id" | "siteId" | "sentAt">) {
+    await write((d) => { siteOf(d, siteId, workspaceId); d.submissions.push({ ...x, urls: x.urls.slice(0, 100), id: randomUUID(), siteId, sentAt: now() }); });
+  },
+  async listSubmissions(workspaceId: string, siteId: string, limit = 10): Promise<IndexNowSubmission[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.submissions.filter((x) => x.siteId === siteId).sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, limit); });
+  },
+  async listInspections(workspaceId: string, siteId: string): Promise<UrlInspection[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.inspections.filter((x) => x.siteId === siteId).sort((a, b) => a.url.localeCompare(b.url)); });
+  },
+  async saveInspection(workspaceId: string, siteId: string, x: Omit<UrlInspection, "id" | "siteId" | "checkedAt">) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.inspections = d.inspections.filter((y) => !(y.siteId === siteId && y.url === x.url));
+      d.inspections.push({ ...x, id: randomUUID(), siteId, checkedAt: now() });
+    });
+  },
+  async indexingDue(): Promise<IndexingDue[]> {
+    return read((d) => d.search.filter((c) => !c.demo).map((c) => ({ workspaceId: d.sites.find((s) => s.id === c.siteId)?.workspaceId ?? "", siteId: c.siteId })).filter((x) => x.workspaceId));
+  },
+
+  // -------------------------------------------------------------------------
+  // Gardien du site
+  // -------------------------------------------------------------------------
+
+  async monitorOf(workspaceId: string, siteId: string): Promise<SiteMonitor> {
+    const found = await read((d) => { siteOf(d, siteId, workspaceId); return d.monitors.find((m) => m.siteId === siteId) ?? null; });
+    if (found) return found;
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const m = d.monitors.find((x) => x.siteId === siteId) ?? newMonitor(siteId);
+      if (!d.monitors.includes(m)) d.monitors.push(m);
+      return m;
+    });
+  },
+  async saveMonitor(workspaceId: string, siteId: string, patch: Partial<Omit<SiteMonitor, "siteId">>) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let m = d.monitors.find((x) => x.siteId === siteId);
+      if (!m) { m = newMonitor(siteId); d.monitors.push(m); }
+      for (const [k, v] of Object.entries(patch)) if (v !== undefined) (m as Record<string, unknown>)[k] = v;
+    });
+  },
+  async addMonitorDay(workspaceId: string, siteId: string, day: string, failed: boolean, ms: number) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let row = d.monitorDays.find((x) => x.siteId === siteId && x.day === day);
+      if (!row) { row = { siteId, day, checks: 0, failures: 0, totalMs: 0 }; d.monitorDays.push(row); }
+      row.checks++;
+      if (failed) row.failures++;
+      row.totalMs += Math.max(0, Math.round(ms));
+    });
+  },
+  async monitorDays(workspaceId: string, siteId: string, since: string): Promise<MonitorDay[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.monitorDays.filter((x) => x.siteId === siteId && x.day >= since).sort((a, b) => a.day.localeCompare(b.day)).map(({ siteId: _s, ...x }) => x); });
+  },
+  async monitorIncidents(workspaceId: string, siteId: string, limit = 10): Promise<MonitorIncident[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.incidents.filter((x) => x.siteId === siteId).sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, limit); });
+  },
+  async openIncident(workspaceId: string, siteId: string, i: { startedAt: string; statusCode: number | null; error: string | null }) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      if (d.incidents.some((x) => x.siteId === siteId && !x.endedAt)) return;
+      d.incidents.push({ id: randomUUID(), siteId, startedAt: i.startedAt, endedAt: null, statusCode: i.statusCode, error: i.error });
+    });
+  },
+  async closeIncident(workspaceId: string, siteId: string, endedAt: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      for (const x of d.incidents) if (x.siteId === siteId && !x.endedAt) x.endedAt = endedAt;
+    });
+  },
+  async monitorDue(): Promise<MonitorDue[]> {
+    return read((d) => {
+      const out: MonitorDue[] = [];
+      const limit = Date.now() - 4 * 60_000;
+      for (const site of d.sites) {
+        const sub = d.subscriptions.find((x) => x.workspaceId === site.workspaceId);
+        const live = sub && (sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now())));
+        if (!live || site.onboardingStep < 8) continue;
+        const m = d.monitors.find((x) => x.siteId === site.id) ?? newMonitor(site.id);
+        if (!m.enabled || (m.lastCheckedAt && new Date(m.lastCheckedAt).getTime() > limit)) continue;
+        const owners = d.memberships.filter((x) => x.workspaceId === site.workspaceId && x.role !== "member").map((x) => d.users.find((u) => u.id === x.userId)?.email).filter(Boolean) as string[];
+        out.push({ workspaceId: site.workspaceId, siteId: site.id, url: site.url, siteName: site.name || site.url, status: m.status, fails: m.fails, sslCheckedAt: m.sslCheckedAt, domainCheckedAt: m.domainCheckedAt, domainSource: m.domainSource, emails: m.alertEmails.length ? m.alertEmails : owners.slice(0, 3) });
+      }
+      return out;
     });
   },
 

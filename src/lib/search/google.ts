@@ -61,7 +61,7 @@ export async function revokeToken(refreshToken: string, f: Fetcher = fetch): Pro
 async function api<T>(f: Fetcher, access: string, path: string, body?: unknown): Promise<GoogleResult<T>> {
   let res: Response;
   try {
-    res = await call(f, `${API}${path}`, { method: body ? "POST" : "GET", headers: { authorization: `Bearer ${access}`, ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    res = await call(f, path.startsWith("https://") ? path : `${API}${path}`, { method: body ? "POST" : "GET", headers: { authorization: `Bearer ${access}`, ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
   } catch {
     return { ok: false, error: "Google ne répond pas. Réessayez dans un instant." };
   }
@@ -100,4 +100,33 @@ export async function dailyQueries(access: string, property: string, from: strin
   const r = await analytics(f, access, property, from, to, ["date", "query"]);
   if (!r.ok) return r;
   return { ok: true, value: r.value.filter((x) => DAY.test(x.keys?.[0] ?? "") && x.keys?.[1]).map((x) => ({ day: x.keys![0], query: x.keys![1].slice(0, 200), clicks: num(x.clicks), impressions: num(x.impressions), position: num(x.position) })) };
+}
+
+// ---------------------------------------------------------------------------
+// Inspection d'URL (même portée en lecture seule ; 2000 pages par jour et par propriété chez Google)
+// ---------------------------------------------------------------------------
+
+export type Inspection = {
+  verdict: "PASS" | "PARTIAL" | "FAIL" | "NEUTRAL" | "VERDICT_UNSPECIFIED" | null;
+  coverage: string | null; indexingState: string | null; pageFetch: string | null; robots: string | null;
+  googleCanonical: string | null; lastCrawlAt: string | null;
+};
+const VERDICTS = new Set(["PASS", "PARTIAL", "FAIL", "NEUTRAL", "VERDICT_UNSPECIFIED"]);
+const cut = (v: unknown, n: number) => (typeof v === "string" && v ? v.slice(0, n) : null);
+
+/** Lit la réponse de Google (champs inconnus ignorés, textes raccourcis). */
+export function readInspection(j: unknown): Inspection {
+  const r = ((j as { inspectionResult?: { indexStatusResult?: Record<string, unknown> } })?.inspectionResult?.indexStatusResult) ?? {};
+  const verdict = typeof r.verdict === "string" && VERDICTS.has(r.verdict) ? (r.verdict as Inspection["verdict"]) : null;
+  const crawl = typeof r.lastCrawlTime === "string" && !Number.isNaN(new Date(r.lastCrawlTime).getTime()) ? new Date(r.lastCrawlTime).toISOString() : null;
+  return {
+    verdict, coverage: cut(r.coverageState, 200), indexingState: cut(r.indexingState, 60), pageFetch: cut(r.pageFetchState, 60),
+    robots: cut(r.robotsTxtState, 60), googleCanonical: cut(r.googleCanonical, 2000), lastCrawlAt: crawl,
+  };
+}
+
+/** État d'indexation d'une page de la propriété. */
+export async function inspectUrl(access: string, property: string, url: string, f: Fetcher = fetch): Promise<GoogleResult<Inspection>> {
+  const r = await api<unknown>(f, access, "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect", { inspectionUrl: url, siteUrl: property, languageCode: "fr" });
+  return r.ok ? { ok: true, value: readInspection(r.value) } : r;
 }

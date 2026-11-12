@@ -17,3 +17,6 @@ for f in "$HERE"/../../supabase/migrations/*.sql; do "${PSQL[@]}" -f "$f"; done
 "${PSQL[@]}" -f "$HERE/admin_test.sql"
 "${PSQL[@]}" -f "$HERE/search_test.sql"
 "${PSQL[@]}" -f "$HERE/automation_test.sql"
+"${PSQL[@]}" -f "$HERE/visibilite_ia_test.sql"
+"${PSQL[@]}" -f "$HERE/gardien_test.sql"
+"${PSQL[@]}" -f "$HERE/positions_test.sql"

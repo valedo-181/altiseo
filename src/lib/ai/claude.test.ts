@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AiError, analyzeSite, costOf, planTopics, writeArticle, type ClaudeLike, type SiteBrief } from "./claude.ts";
+import { AiError, analyzeSite, costOf, planTopics, proposeAiQuestions, writeArticle, type ClaudeLike, type SiteBrief } from "./claude.ts";
 import { htmlToText } from "../seo/text.ts";
 import { markdownToHtml } from "../domain/markdown.ts";
 
@@ -86,4 +86,13 @@ test("htmlToText : titre, description, texte sans scripts", () => {
   assert.equal(r.description, "Déménagements");
   assert.equal(r.text, "Bonjour\nTexte ici");
   assert.ok(htmlToText("<p>" + "a".repeat(9000) + "</p>", 100).text.length <= 101);
+});
+
+test("questions pour les IA : numéros retirés, doublons et questions déjà suivies écartés", async () => {
+  const { c, calls } = fake({ questions: ["1. Quel déménageur recommandes-tu à Lausanne ?", "Quel déménageur recommandes-tu à Lausanne ?", "Prix d'un déménagement 3,5 pièces à Lausanne ?", "ok", "Combien coûte un garde-meubles ?"] });
+  const r = await proposeAiQuestions(site, ["déménagement lausanne"], 3, ["Combien coûte un garde-meubles ?"], c);
+  assert.deepEqual(r.questions, ["Quel déménageur recommandes-tu à Lausanne ?", "Prix d'un déménagement 3,5 pièces à Lausanne ?"]);
+  const prompt = calls[0].messages[0].content as string;
+  assert.ok(prompt.includes("déménagement lausanne") && prompt.includes("Combien coûte un garde-meubles ?"));
+  assert.ok(calls[0].system[0].text.includes("Ne nomme jamais l'entreprise"));
 });

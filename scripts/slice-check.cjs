@@ -173,6 +173,92 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   await page.getByText("Réglages enregistrés.").waitFor();
   assert(true, "réglages de rédaction enregistrés");
 
+  console.log("S25 visibilité IA (réponses d'exemple)");
+  await page.goto(BASE + "/app/visibilite-ia");
+  await page.getByText("Quelles questions vos clients posent-ils aux IA ?").waitFor();
+  await page.getByRole("button", { name: "Proposer des questions" }).click();
+  await page.getByText("Questions suivies (5 sur 10)").waitFor();
+  assert(await page.getByRole("row").count() === 0, "5 questions proposées, pas encore de réponse");
+  await page.getByLabel("Nouvelle question").fill("Quel déménageur recommandes-tu à Lausanne ?");
+  await page.getByRole("button", { name: "Ajouter la question" }).click();
+  await page.getByText("Question ajoutée.").waitFor();
+  await page.getByRole("button", { name: "Interroger les IA maintenant" }).click();
+  await page.getByRole("heading", { name: "Réponses de la semaine" }).waitFor({ timeout: 30000 });
+  assert(await page.getByRole("row").count() === 7, "6 questions × 2 IA lues");
+  await page.getByText("Réponses d'exemple :").waitFor();
+  assert(await page.getByRole("columnheader", { name: "Perplexity" }).count() === 1, "tableau question × IA de l'offre Grow");
+  assert(await page.getByRole("button", { name: "Interroger les IA maintenant" }).count() === 0, "un seul passage par semaine");
+  await page.getByText("Votre site est-il prêt pour les IA ?").waitFor();
+  await shot("S25");
+  const nQ = await page.getByRole("button", { name: "Retirer" }).count();
+  await page.getByRole("button", { name: "Retirer" }).first().click();
+  await page.waitForFunction((n) => document.querySelectorAll("button").length && [...document.querySelectorAll("button")].filter((b) => b.textContent === "Retirer").length === n - 1, nQ);
+  assert(true, "question retirée");
+
+  console.log("S26 gardien du site");
+  await page.goto(BASE + "/app/gardien");
+  await page.getByRole("heading", { name: "Gardien du site" }).waitFor();
+  await page.getByText("Pas encore vérifié").waitFor();
+  await page.getByLabel("Adresses qui reçoivent les alertes").fill("pas-une-adresse");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await page.getByText("Cette adresse n'est pas valide : pas-une-adresse").waitFor();
+  assert(true, "adresse d'alerte invalide refusée");
+  await page.getByLabel("Adresses qui reçoivent les alertes").fill("alertes@exemple.ch");
+  await page.getByLabel("Échéance du nom de domaine").fill("2027-03-14");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await page.getByText("Réglages du gardien enregistrés.").waitFor();
+  await page.getByText("Jusqu'au 14 mars 2027").waitFor();
+  assert(true, "échéance du domaine saisie à la main");
+  await page.getByRole("button", { name: "Vérifier maintenant" }).click();
+  await page.getByText("Dernière vérification").waitFor({ timeout: 20000 });
+  assert(true, "vérification à la demande");
+  await shot("S26");
+
+  console.log("S27 positions Google (positions d'exemple)");
+  await page.goto(BASE + "/app/positions");
+  await page.getByText("Quels mots-clés voulez-vous suivre ?").waitFor();
+  await page.getByRole("button", { name: "Reprendre mes mots-clés" }).click();
+  await page.getByRole("heading", { name: /Mots-clés suivis \([1-9]\d* sur 50\)/ }).waitFor();
+  const nK = Number((await page.getByRole("heading", { name: /Mots-clés suivis/ }).textContent()).match(/\((\d+)/)[1]);
+  assert(nK >= 1 && nK <= 10, `${nK} mots-clés repris de Search Console et du calendrier (10 au plus)`);
+  await page.getByLabel("Nouveau mot-clé").fill("Déménagement   Lausanne");
+  await page.getByRole("button", { name: "Ajouter le mot-clé" }).click();
+  await page.getByText("Mot-clé ajouté.").waitFor();
+  await page.getByLabel("Nouveau mot-clé").fill("déménagement lausanne");
+  await page.getByRole("button", { name: "Ajouter le mot-clé" }).click();
+  await page.getByText("Ce mot-clé est déjà suivi.").waitFor();
+  assert(true, "doublon refusé (majuscules et espaces ignorés)");
+  await page.getByRole("button", { name: "Mesurer les positions maintenant" }).click();
+  await page.getByRole("heading", { name: "Vos positions" }).waitFor({ timeout: 30000 });
+  assert(await page.locator("section[aria-labelledby=h-ranks] tbody tr").count() === nK + 1, "une ligne par mot-clé mesuré");
+  await page.getByText("Positions d'exemple :").waitFor();
+  assert(await page.getByRole("button", { name: "Mesurer les positions maintenant" }).count() === 0, "une mesure par semaine");
+  await shot("S27");
+
+  console.log("S28 indexation (Search Console d'exemple + IndexNow)");
+  await page.goto(BASE + "/app/indexation");
+  await page.getByRole("heading", { name: "Dans Google" }).waitFor();
+  await page.getByRole("button", { name: "Vérifier mes pages" }).click();
+  await page.getByText(/^\d+ pages? vérifiées?/).waitFor({ timeout: 20000 });
+  await page.getByText("États d'exemple :").waitFor();
+  assert(await page.locator("section[aria-labelledby=h-google] tbody tr").count() >= 1, "état Google de l'accueil et des articles");
+  await page.getByRole("button", { name: "Vérifier mes pages" }).first().click();
+  await page.getByText("Toutes les pages ont été vérifiées il y a moins d'une heure.").waitFor();
+  assert(true, "pas de nouvelle vérification dans l'heure");
+  assert(await page.getByRole("link", { name: /\.txt$/ }).count() === 1, "fichier de clé IndexNow à télécharger");
+  await page.getByRole("button", { name: "Vérifier le fichier" }).click();
+  await page.getByLabel("Adresses à signaler").waitFor();
+  await page.getByLabel("Adresses à signaler").fill("https://autre-site.ch/page");
+  await page.getByRole("button", { name: "Signaler ces pages" }).click();
+  await page.getByText(/Ces adresses ne sont pas sur/).waitFor();
+  assert(true, "adresse d'un autre site refusée");
+  await page.getByLabel("Adresses à signaler").fill("https://demenagements-leman.ch/nouvelle-page/");
+  await page.getByRole("button", { name: "Signaler ces pages" }).click();
+  await page.getByText(/1 page : Pages signalées/).waitFor();
+  await page.getByText("Derniers envois").waitFor();
+  assert(true, "page signalée à IndexNow et inscrite dans l'historique");
+  await shot("S28");
+
   console.log("Sécurité : un autre compte ne voit rien");
   const other = await browser.newContext();
   const p2 = await other.newPage();
@@ -191,7 +277,7 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const pm = await mob.newPage();
   pm.on("pageerror", (e) => errors.push("mobile: " + e.message));
-  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles"]) {
+  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia", "/app/gardien", "/app/positions", "/app/indexation"]) {
     await pm.goto(BASE + path);
     const w = await pm.evaluate(() => document.documentElement.scrollWidth);
     assert(w <= 390, `${path} sans défilement horizontal à 390 px (${w})`);
@@ -199,6 +285,8 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   if (SHOTS) { await pm.goto(BASE + "/app/calendrier"); await pm.screenshot({ path: `${SHOTS}/S12-mobile.png`, fullPage: true }); }
   if (SHOTS) {
     await pm.goto(BASE + "/app/mots-cles"); await pm.screenshot({ path: `${SHOTS}/S24-mobile.png`, fullPage: true });
+    await pm.goto(BASE + "/app/visibilite-ia"); await pm.screenshot({ path: `${SHOTS}/S25-mobile.png`, fullPage: true });
+    await pm.goto(BASE + "/app/positions"); await pm.screenshot({ path: `${SHOTS}/S27-mobile.png`, fullPage: true });
     const dark = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2, storageState: await ctx.storageState() });
     const pd = await dark.newPage();
     await pd.goto(BASE + "/app/mots-cles");

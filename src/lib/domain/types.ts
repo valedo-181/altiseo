@@ -156,3 +156,51 @@ export type SearchReport = {
   previous: SearchTotals;
   queries: SearchQuery[]; // triées par clics puis affichages
 };
+
+// Visibilité IA (supabase/migrations/20261115000000_visibilite_ia.sql) -------------------------
+export type AiEngineName = "chatgpt" | "gemini" | "perplexity" | "claude";
+export type AiQuestion = { id: string; siteId: string; question: string; source: "suggested" | "manual"; createdAt: string };
+export type AiRun = {
+  id: string; siteId: string; week: string; status: "running" | "done" | "error";
+  readiness: { blockedBots: string[]; llmsTxt: boolean; faq: boolean; organization: boolean } | null;
+  error: string | null; demo: boolean; startedAt: string; finishedAt: string | null;
+};
+export type AiCheck = {
+  id: string; siteId: string; questionId: string; engine: AiEngineName; week: string; status: "ok" | "error";
+  cited: boolean; position: number | null; linked: boolean; competitors: Array<{ name: string; domain: string }>;
+  sources: string[]; excerpt: string | null; error: string | null; demo: boolean; checkedAt: string;
+};
+export type AiPlan = { maxQuestions: number; engines: AiEngineName[] };
+export type AiDueSite = { workspaceId: string; siteId: string; maxQuestions: number; engines: AiEngineName[] };
+
+// Gardien du site (supabase/migrations/20261116000000_gardien.sql) ------------------------------
+export type SiteMonitor = {
+  siteId: string; enabled: boolean; status: "unknown" | "up" | "down"; fails: number;
+  lastCheckedAt: string | null; lastStatusCode: number | null; lastMs: number | null; lastError: string | null; downSince: string | null;
+  sslExpiresAt: string | null; sslCheckedAt: string | null;
+  domainExpiresOn: string | null; domainSource: "rdap" | "manual" | null; domainCheckedAt: string | null;
+  alertEmails: string[]; alertsSent: { ssl?: { until?: string; threshold?: number }; domain?: { until?: string; threshold?: number } };
+};
+export type MonitorDay = { day: string; checks: number; failures: number; totalMs: number };
+export type MonitorIncident = { id: string; siteId: string; startedAt: string; endedAt: string | null; statusCode: number | null; error: string | null };
+export type MonitorDue = {
+  workspaceId: string; siteId: string; url: string; siteName: string; status: SiteMonitor["status"]; fails: number;
+  sslCheckedAt: string | null; domainCheckedAt: string | null; domainSource: SiteMonitor["domainSource"]; emails: string[];
+};
+
+// Positions Google et indexation (supabase/migrations/20261117000000_positions_indexation.sql) -----
+export type RankKeyword = { id: string; siteId: string; phrase: string; source: "manual" | "calendar" | "search_console"; createdAt: string };
+export type RankCheck = {
+  id: string; siteId: string; keywordId: string; week: string; status: "ok" | "error";
+  position: number | null; url: string | null; top: Array<{ rank: number; title: string; domain: string }>;
+  error: string | null; demo: boolean; checkedAt: string;
+};
+export type RankDue = { workspaceId: string; siteId: string; maxKeywords: number };
+export type SiteIndexing = { siteId: string; indexnowKey: string; keyVerifiedAt: string | null; keyError: string | null; autoSubmit: boolean };
+export type IndexNowSubmission = { id: string; siteId: string; urls: string[]; source: "manual" | "article"; statusCode: number | null; ok: boolean; error: string | null; demo: boolean; sentAt: string };
+export type UrlInspection = {
+  id: string; siteId: string; url: string; verdict: "PASS" | "PARTIAL" | "FAIL" | "NEUTRAL" | "VERDICT_UNSPECIFIED" | null;
+  coverage: string | null; indexingState: string | null; pageFetch: string | null; robots: string | null; googleCanonical: string | null;
+  lastCrawlAt: string | null; error: string | null; demo: boolean; checkedAt: string;
+};
+export type IndexingDue = { workspaceId: string; siteId: string };

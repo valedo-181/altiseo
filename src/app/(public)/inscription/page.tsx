@@ -4,7 +4,7 @@ import { AuthShell } from "@/components/auth-shell";
 import { demoMode } from "@/lib/config";
 import { SignUpForm } from "../auth-forms";
 
-export const metadata: Metadata = { title: "Créer un compte", description: "Essayez Altiseo 3 jours gratuitement, sans carte bancaire : trente sujets d'articles proposés dès aujourd'hui." };
+export const metadata: Metadata = { alternates: { canonical: "/inscription" }, title: "Créer un compte", description: "Essayez Altiseo 3 jours gratuitement, sans carte bancaire : trente sujets d'articles proposés dès aujourd'hui." };
 
 /** S03 : inscription (démo : sans mot de passe ni e-mail de confirmation). */
 export default function SignUp() {

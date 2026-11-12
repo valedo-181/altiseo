@@ -9,7 +9,7 @@ import { buttonClass } from "@/components/ui/button";
 import { ScoreGauge } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = { alternates: { canonical: "/" },
   title: "Altiseo : votre blog SEO, écrit et publié pour vous",
   description: "Altiseo prépare vos sujets, écrit un article par jour dans votre ton et l'envoie sur votre site. Vous relisez, vous publiez. Essai gratuit de 3 jours.",
 };

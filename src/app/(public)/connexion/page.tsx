@@ -5,7 +5,7 @@ import { Banner } from "@/components/ui/feedback";
 import { demoMode } from "@/lib/config";
 import { SignInForm } from "../auth-forms";
 
-export const metadata: Metadata = { title: "Connexion", description: "Connectez-vous à Altiseo pour retrouver votre calendrier, vos articles et le suivi de vos mots-clés." };
+export const metadata: Metadata = { alternates: { canonical: "/connexion" }, title: "Connexion", description: "Connectez-vous à Altiseo pour retrouver votre calendrier, vos articles et le suivi de vos mots-clés." };
 
 const ERRORS: Record<string, string> = {
   lien: "Ce lien de connexion n'est plus valable (il sert une seule fois, pendant une heure). Demandez-en un nouveau.",

@@ -7,7 +7,7 @@ import { PublicHeader } from "@/components/public-header";
 import { SiteFooter } from "@/components/site-footer";
 import { buttonClass } from "@/components/ui/button";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = { alternates: { canonical: "/tarifs" },
   title: "Tarifs",
   description: "Deux offres Altiseo en francs suisses : Grow à 99 CHF et Scale à 249 CHF par mois. Essai gratuit de 3 jours, sans carte bancaire.",
 };

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PublicHeader } from "@/components/public-header";
 import { ServicesFilm } from "./film";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = { alternates: { canonical: "/services" },
   title: "Nos services",
   description: "Ce qu'Altiseo fait pour votre blog, étape par étape : lecture de votre site, un mois de sujets, un article par jour, publication sur votre site, audit SEO.",
 };

@@ -173,6 +173,28 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   await page.getByText("Réglages enregistrés.").waitFor();
   assert(true, "réglages de rédaction enregistrés");
 
+  console.log("S25 visibilité IA (réponses d'exemple)");
+  await page.goto(BASE + "/app/visibilite-ia");
+  await page.getByText("Quelles questions vos clients posent-ils aux IA ?").waitFor();
+  await page.getByRole("button", { name: "Proposer des questions" }).click();
+  await page.getByText("Questions suivies (5 sur 10)").waitFor();
+  assert(await page.getByRole("row").count() === 0, "5 questions proposées, pas encore de réponse");
+  await page.getByLabel("Nouvelle question").fill("Quel déménageur recommandes-tu à Lausanne ?");
+  await page.getByRole("button", { name: "Ajouter la question" }).click();
+  await page.getByText("Question ajoutée.").waitFor();
+  await page.getByRole("button", { name: "Interroger les IA maintenant" }).click();
+  await page.getByRole("heading", { name: "Réponses de la semaine" }).waitFor({ timeout: 30000 });
+  assert(await page.getByRole("row").count() === 7, "6 questions × 2 IA lues");
+  await page.getByText("Réponses d'exemple :").waitFor();
+  assert(await page.getByRole("columnheader", { name: "Perplexity" }).count() === 1, "tableau question × IA de l'offre Grow");
+  assert(await page.getByRole("button", { name: "Interroger les IA maintenant" }).count() === 0, "un seul passage par semaine");
+  await page.getByText("Votre site est-il prêt pour les IA ?").waitFor();
+  await shot("S25");
+  const nQ = await page.getByRole("button", { name: "Retirer" }).count();
+  await page.getByRole("button", { name: "Retirer" }).first().click();
+  await page.waitForFunction((n) => document.querySelectorAll("button").length && [...document.querySelectorAll("button")].filter((b) => b.textContent === "Retirer").length === n - 1, nQ);
+  assert(true, "question retirée");
+
   console.log("Sécurité : un autre compte ne voit rien");
   const other = await browser.newContext();
   const p2 = await other.newPage();
@@ -191,7 +213,7 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const pm = await mob.newPage();
   pm.on("pageerror", (e) => errors.push("mobile: " + e.message));
-  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles"]) {
+  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia"]) {
     await pm.goto(BASE + path);
     const w = await pm.evaluate(() => document.documentElement.scrollWidth);
     assert(w <= 390, `${path} sans défilement horizontal à 390 px (${w})`);
@@ -199,6 +221,7 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   if (SHOTS) { await pm.goto(BASE + "/app/calendrier"); await pm.screenshot({ path: `${SHOTS}/S12-mobile.png`, fullPage: true }); }
   if (SHOTS) {
     await pm.goto(BASE + "/app/mots-cles"); await pm.screenshot({ path: `${SHOTS}/S24-mobile.png`, fullPage: true });
+    await pm.goto(BASE + "/app/visibilite-ia"); await pm.screenshot({ path: `${SHOTS}/S25-mobile.png`, fullPage: true });
     const dark = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2, storageState: await ctx.storageState() });
     const pd = await dark.newPage();
     await pd.goto(BASE + "/app/mots-cles");

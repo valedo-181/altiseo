@@ -28,7 +28,7 @@ import { writeDemoArticle } from "@/lib/domain/write";
  * Volume et difficulté des mots-clés : DataForSEO, à brancher.
  */
 
-async function brief(workspaceId: string, site: Site): Promise<SiteBrief> {
+export async function brief(workspaceId: string, site: Site): Promise<SiteBrief> {
   const competitors = (await db.listCompetitors(workspaceId, site.id)).map((c) => c.url);
   return {
     name: site.name, url: site.url, theme: site.theme, language: site.language, businessDescription: site.businessDescription,

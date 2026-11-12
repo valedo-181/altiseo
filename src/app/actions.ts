@@ -6,6 +6,7 @@ import { requireAccount, requireSite, ONBOARDING_STEPS, type OnboardingSlug } fr
 import { config, siteOrigin } from "@/lib/config";
 import { userClient } from "@/lib/supabase/server";
 import * as svc from "@/lib/app/service";
+import * as geo from "@/lib/app/geo";
 import { endSession, rememberSite, startSession } from "@/lib/app/session";
 import { db, Conflict } from "@/lib/data/store";
 import { INSTRUCTIONS_MAX, type Lang } from "@/lib/domain/types";
@@ -327,6 +328,41 @@ export async function disconnectSearch() {
   const { workspace, site } = await requireSite();
   await svc.disconnectSearch(workspace.id, site.id);
   revalidatePath("/app/mots-cles");
+}
+
+// ---------------------------------------------------------------------------
+// Visibilité IA
+// ---------------------------------------------------------------------------
+
+export async function addAiQuestion(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await geo.addAiQuestion(workspace.id, site.id, str(f, "question"));
+  revalidatePath("/app/visibilite-ia");
+  return r.ok ? { ok: "Question ajoutée. Elle sera posée aux IA au prochain passage." } : { error: r.error };
+}
+
+export async function suggestAiQuestions(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await geo.suggestAiQuestions(workspace.id, site.id);
+  revalidatePath("/app/visibilite-ia");
+  return r.ok ? { ok: `${r.value} question${r.value > 1 ? "s" : ""} ajoutée${r.value > 1 ? "s" : ""}. Relisez-les et retirez celles qui ne vous ressemblent pas.` } : { error: r.error };
+}
+
+export async function removeAiQuestion(f: FormData) {
+  const { workspace, site } = await requireSite();
+  const id = str(f, "id");
+  if (id) await db.removeAiQuestion(workspace.id, site.id, id);
+  revalidatePath("/app/visibilite-ia");
+}
+
+export async function runAiVisibility(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await geo.runAiVisibility(workspace.id, site.id, { budgetMs: 240_000 });
+  revalidatePath("/app/visibilite-ia");
+  if (!r.ok) return { error: r.error };
+  const v = r.value;
+  if (v.remaining) return { ok: `${v.asked} réponses lues. Il en reste ${v.remaining} : relancez, ou elles seront lues au prochain passage automatique.` };
+  return { ok: v.errors ? `Terminé : ${v.asked} réponses, dont ${v.errors} en erreur.` : `Terminé : ${v.asked} réponses lues.` };
 }
 
 // ---------------------------------------------------------------------------

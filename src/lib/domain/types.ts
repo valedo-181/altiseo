@@ -156,3 +156,19 @@ export type SearchReport = {
   previous: SearchTotals;
   queries: SearchQuery[]; // triées par clics puis affichages
 };
+
+// Visibilité IA (supabase/migrations/20261115000000_visibilite_ia.sql) -------------------------
+export type AiEngineName = "chatgpt" | "gemini" | "perplexity" | "claude";
+export type AiQuestion = { id: string; siteId: string; question: string; source: "suggested" | "manual"; createdAt: string };
+export type AiRun = {
+  id: string; siteId: string; week: string; status: "running" | "done" | "error";
+  readiness: { blockedBots: string[]; llmsTxt: boolean; faq: boolean; organization: boolean } | null;
+  error: string | null; demo: boolean; startedAt: string; finishedAt: string | null;
+};
+export type AiCheck = {
+  id: string; siteId: string; questionId: string; engine: AiEngineName; week: string; status: "ok" | "error";
+  cited: boolean; position: number | null; linked: boolean; competitors: Array<{ name: string; domain: string }>;
+  sources: string[]; excerpt: string | null; error: string | null; demo: boolean; checkedAt: string;
+};
+export type AiPlan = { maxQuestions: number; engines: AiEngineName[] };
+export type AiDueSite = { workspaceId: string; siteId: string; maxQuestions: number; engines: AiEngineName[] };

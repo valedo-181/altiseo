@@ -2,7 +2,9 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import { AI_PLANS, weekOf } from "@/lib/geo/analyze";
+import { localDate } from "@/lib/domain/dates";
 
 /**
  * Couche de données en MODE DÉMO : un fichier JSON local (.data/demo.json), un seul processus.
@@ -26,9 +28,12 @@ type Doc = {
   publications: Publication[];
   audits: AuditRun[];
   search: Array<SearchConnection & { report: SearchReport | null }>;
+  aiQuestions: AiQuestion[];
+  aiRuns: AiRun[];
+  aiChecks: AiCheck[];
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import type { DueTopic } from "@/lib/jobs/select";
@@ -81,6 +86,9 @@ function write<T>(fn: (d: Doc) => T): Promise<T> {
 }
 
 const now = () => new Date().toISOString();
+
+/** Lundi de la semaine, à Zurich (comme la base). */
+const mondayOf = (at: Date) => weekOf(localDate(at, "Europe/Zurich"));
 
 function siteOf(d: Doc, siteId: string, workspaceId: string): Site {
   const s = d.sites.find((x) => x.id === siteId);
@@ -387,6 +395,93 @@ export const demoDb = {
     await write((d) => {
       siteOf(d, siteId, workspaceId);
       d.search = d.search.filter((x) => x.siteId !== siteId);
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Visibilité IA
+  // -------------------------------------------------------------------------
+
+  async aiPlan(workspaceId: string): Promise<AiPlan> {
+    return read((d) => {
+      const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId);
+      const p = sub ? AI_PLANS[sub.planCode] : null;
+      return p ? { maxQuestions: p.maxQuestions, engines: [...p.engines] } : { maxQuestions: 0, engines: [] };
+    });
+  },
+  async listAiQuestions(workspaceId: string, siteId: string): Promise<AiQuestion[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.aiQuestions.filter((q) => q.siteId === siteId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); });
+  },
+  async addAiQuestions(workspaceId: string, siteId: string, items: Array<{ question: string; source: AiQuestion["source"] }>): Promise<number> {
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId);
+      if (!sub) throw new QuotaReached();
+      const max = AI_PLANS[sub.planCode]?.maxQuestions ?? 0;
+      let n = 0;
+      for (const it of items) {
+        const mine = d.aiQuestions.filter((q) => q.siteId === siteId);
+        if (mine.some((q) => q.question === it.question)) continue;
+        if (mine.length >= max) break;
+        d.aiQuestions.push({ id: randomUUID(), siteId, question: it.question, source: it.source, createdAt: new Date(Date.now() + n).toISOString() });
+        n++;
+      }
+      return n;
+    });
+  },
+  async removeAiQuestion(workspaceId: string, siteId: string, questionId: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.aiQuestions = d.aiQuestions.filter((q) => !(q.id === questionId && q.siteId === siteId));
+      d.aiChecks = d.aiChecks.filter((c) => c.questionId !== questionId);
+    });
+  },
+  async listAiRuns(workspaceId: string, siteId: string, limit = 8): Promise<AiRun[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.aiRuns.filter((r) => r.siteId === siteId).sort((a, b) => b.week.localeCompare(a.week)).slice(0, limit); });
+  },
+  async claimAiRun(workspaceId: string, siteId: string, week: string, demo: boolean): Promise<AiRun | null> {
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const cur = d.aiRuns.find((r) => r.siteId === siteId && r.week === week);
+      if (cur) return cur.status === "running" ? cur : null;
+      const run: AiRun = { id: randomUUID(), siteId, week, status: "running", readiness: null, error: null, demo, startedAt: now(), finishedAt: null };
+      d.aiRuns.push(run);
+      return run;
+    });
+  },
+  async updateAiRun(workspaceId: string, siteId: string, runId: string, patch: Partial<Pick<AiRun, "status" | "readiness" | "error">> & { finished?: boolean }) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const r = d.aiRuns.find((x) => x.id === runId && x.siteId === siteId);
+      if (!r) return;
+      const { finished, ...rest } = patch;
+      Object.assign(r, rest, finished ? { finishedAt: now() } : {});
+    });
+  },
+  async listAiChecks(workspaceId: string, siteId: string, weeks: string[]): Promise<AiCheck[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.aiChecks.filter((c) => c.siteId === siteId && weeks.includes(c.week)); });
+  },
+  async saveAiCheck(workspaceId: string, siteId: string, c: Omit<AiCheck, "id" | "siteId" | "checkedAt">) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.aiChecks = d.aiChecks.filter((x) => !(x.questionId === c.questionId && x.engine === c.engine && x.week === c.week));
+      d.aiChecks.push({ ...c, id: randomUUID(), siteId, checkedAt: now() });
+    });
+  },
+  async aiVisibilityDue(): Promise<AiDueSite[]> {
+    return read((d) => {
+      const week = mondayOf(new Date());
+      const out: AiDueSite[] = [];
+      for (const site of d.sites) {
+        const sub = d.subscriptions.find((x) => x.workspaceId === site.workspaceId);
+        if (!sub || site.onboardingStep < 8) continue;
+        const live = sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now()));
+        const plan = AI_PLANS[sub.planCode];
+        if (!live || !plan || !d.aiQuestions.some((q) => q.siteId === site.id)) continue;
+        if (d.aiRuns.some((r) => r.siteId === site.id && r.week === week && r.status !== "running")) continue;
+        out.push({ workspaceId: site.workspaceId, siteId: site.id, maxQuestions: plan.maxQuestions, engines: [...plan.engines] });
+      }
+      return out;
     });
   },
 

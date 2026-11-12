@@ -142,6 +142,33 @@ Propose exactement ${count} sujets différents.${avoid.length ? `\nN'en propose 
 }
 
 // ---------------------------------------------------------------------------
+// Visibilité IA : questions que les clients posent aux assistants (ChatGPT, Gemini…)
+// ---------------------------------------------------------------------------
+
+const QuestionsSchema = z.object({
+  questions: z.array(z.string()).describe("Questions, une par entrée, sans numéro"),
+});
+
+/**
+ * Questions qu'un client poserait à un assistant IA avant de choisir une entreprise comme celle-ci :
+ * naturelles, dans la langue du site, avec la ville ou la région quand l'activité est locale, sans
+ * nommer l'entreprise (on veut savoir si l'IA la cite d'elle-même).
+ */
+export async function proposeAiQuestions(site: SiteBrief, keywords: string[], count: number, avoid: string[], c = claude()): Promise<{ questions: string[]; usage: Usage }> {
+  const { out, usage } = await ask(c, QuestionsSchema, [
+    { type: "text", text: `Tu aides une PME à savoir si les assistants IA (ChatGPT, Gemini, Perplexity, Claude) la recommandent. Tu écris les questions que ses futurs clients poseraient vraiment à un assistant avant de choisir un prestataire : recommandations (« quel … recommandes-tu à … ? »), prix, comparaisons, conseils pratiques. Phrases naturelles et complètes, comme on les tape dans ChatGPT, en ${LANG_NAME[site.language]}. Mets la ville ou la région quand l'activité est locale. Ne nomme jamais l'entreprise ni ses concurrents. 15 mots au plus par question.\n\n${RULES}`, cache_control: { type: "ephemeral" } },
+  ], `${briefText(site)}
+${keywords.length ? `\nMots-clés suivis :\n${keywords.slice(0, 30).map((k) => `- ${k}`).join("\n")}\n` : ""}
+Propose exactement ${count} questions différentes.${avoid.length ? `\nAucune ne doit ressembler à celles-ci (déjà suivies) :\n${avoid.map((t) => `- ${t}`).join("\n")}` : ""}`, 4000);
+  const seen = new Set(avoid.map((t) => t.toLowerCase()));
+  const questions = out.questions
+    .map((q) => q.replace(/\s+/g, " ").replace(/^\s*[-\d.)]+\s*/, "").trim())
+    .filter((q) => q.length >= 5 && q.length <= 300 && !seen.has(q.toLowerCase()) && (seen.add(q.toLowerCase()), true))
+    .slice(0, count);
+  return { questions, usage };
+}
+
+// ---------------------------------------------------------------------------
 // Article (F03)
 // ---------------------------------------------------------------------------
 

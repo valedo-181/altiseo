@@ -2,7 +2,7 @@ import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
 import { supabaseUrl } from "@/lib/supabase/url";
-import type { Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import type { DueTopic } from "@/lib/jobs/select";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
@@ -88,6 +88,18 @@ const toPublication = (r: Row): Publication => ({
   id: s(r.id), articleId: s(r.article_id), integrationId: s(r.integration_id), remoteId: (r.remote_id as string) ?? null,
   remoteUrl: (r.remote_url as string) ?? null, remoteMediaId: (r.remote_media_id as string) ?? null, remoteMediaSrc: (r.remote_media_src as string) ?? null, status: r.status as Publication["status"], error: (r.last_error as string) ?? null,
   lastAttemptAt: s(r.last_attempt_at ?? r.updated_at),
+});
+
+
+const toAiQuestion = (r: Row): AiQuestion => ({ id: s(r.id), siteId: s(r.site_id), question: s(r.question), source: r.source === "suggested" ? "suggested" : "manual", createdAt: s(r.created_at) });
+const toAiRun = (r: Row): AiRun => ({
+  id: s(r.id), siteId: s(r.site_id), week: s(r.week), status: r.status as AiRun["status"], readiness: (r.readiness as AiRun["readiness"]) ?? null,
+  error: (r.error as string) ?? null, demo: Boolean(r.demo), startedAt: s(r.started_at), finishedAt: (r.finished_at as string) ?? null,
+});
+const toAiCheck = (r: Row): AiCheck => ({
+  id: s(r.id), siteId: s(r.site_id), questionId: s(r.question_id), engine: r.engine as AiEngineName, week: s(r.week), status: r.status === "error" ? "error" : "ok",
+  cited: Boolean(r.cited), position: (r.position as number) ?? null, linked: Boolean(r.linked), competitors: (r.competitors as AiCheck["competitors"]) ?? [],
+  sources: (r.sources as string[]) ?? [], excerpt: (r.excerpt as string) ?? null, error: (r.error as string) ?? null, demo: Boolean(r.demo), checkedAt: s(r.checked_at),
 });
 
 /** Le site existe, appartient à l'espace, et la personne connectée y a accès (RLS). */
@@ -358,6 +370,83 @@ export const supabaseDb = {
   async removeSearchConnection(workspaceId: string, siteId: string) {
     await siteOf(workspaceId, siteId);
     check(await adminClient().from("search_connections").delete().eq("site_id", siteId));
+  },
+
+  // Visibilité IA -------------------------------------------------------------
+  // Lecture : client de la personne (la RLS filtre). Écriture : serveur, après siteOf.
+  async aiPlan(workspaceId: string): Promise<AiPlan> {
+    const sb = await userClient();
+    const r = check(await sb.from("subscriptions").select("plans(ai_questions, ai_engines)").eq("workspace_id", workspaceId).maybeSingle()) as Row | null;
+    const p = (r?.plans as Row | null) ?? null;
+    return { maxQuestions: Number(p?.ai_questions ?? 0), engines: ((p?.ai_engines as AiEngineName[]) ?? []) };
+  },
+  async listAiQuestions(workspaceId: string, siteId: string): Promise<AiQuestion[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("ai_questions").select("*").eq("site_id", siteId).order("created_at").order("question")) as Row[] | null) ?? []).map(toAiQuestion);
+  },
+  /** Ajoute les questions dans l'ordre ; s'arrête au quota de l'offre, ignore les doublons. Rend le nombre ajouté. */
+  async addAiQuestions(workspaceId: string, siteId: string, items: Array<{ question: string; source: AiQuestion["source"] }>): Promise<number> {
+    await siteOf(workspaceId, siteId);
+    let n = 0;
+    for (const it of items) {
+      const r = await adminClient().from("ai_questions").insert({ workspace_id: workspaceId, site_id: siteId, question: it.question, source: it.source });
+      if (r.error?.code === "23505") continue;
+      if (r.error?.code === "Q0001") break;
+      check(r);
+      n++;
+    }
+    return n;
+  },
+  async removeAiQuestion(workspaceId: string, siteId: string, questionId: string) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("ai_questions").delete().eq("id", questionId).eq("site_id", siteId).eq("workspace_id", workspaceId));
+  },
+  async listAiRuns(workspaceId: string, siteId: string, limit = 8): Promise<AiRun[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("ai_runs").select("*").eq("site_id", siteId).order("week", { ascending: false }).limit(limit)) as Row[] | null) ?? []).map(toAiRun);
+  },
+  /** Passage de la semaine : créé, ou repris s'il est resté en cours ; null s'il est déjà terminé. */
+  async claimAiRun(workspaceId: string, siteId: string, week: string, demo: boolean): Promise<AiRun | null> {
+    await siteOf(workspaceId, siteId);
+    const ad = adminClient();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const cur = check(await ad.from("ai_runs").select("*").eq("site_id", siteId).eq("week", week).maybeSingle()) as Row | null;
+      if (cur) return cur.status === "running" ? toAiRun(cur) : null;
+      const ins = await ad.from("ai_runs").insert({ workspace_id: workspaceId, site_id: siteId, week, demo }).select("*").single();
+      if (ins.error?.code === "23505") continue; // créé au même moment par un autre passage
+      return toAiRun(one(ins));
+    }
+    return null;
+  },
+  async updateAiRun(workspaceId: string, siteId: string, runId: string, patch: Partial<Pick<AiRun, "status" | "readiness" | "error">> & { finished?: boolean }) {
+    await siteOf(workspaceId, siteId);
+    const row: Row = {};
+    if (patch.status) row.status = patch.status;
+    if (patch.readiness !== undefined) row.readiness = patch.readiness;
+    if (patch.error !== undefined) row.error = patch.error?.slice(0, 500) ?? null;
+    if (patch.finished) row.finished_at = new Date().toISOString();
+    check(await adminClient().from("ai_runs").update(row).eq("id", runId).eq("site_id", siteId));
+  },
+  async listAiChecks(workspaceId: string, siteId: string, weeks: string[]): Promise<AiCheck[]> {
+    await siteOf(workspaceId, siteId);
+    if (!weeks.length) return [];
+    const sb = await userClient();
+    return ((check(await sb.from("ai_checks").select("*").eq("site_id", siteId).in("week", weeks)) as Row[] | null) ?? []).map(toAiCheck);
+  },
+  async saveAiCheck(workspaceId: string, siteId: string, c: Omit<AiCheck, "id" | "siteId" | "checkedAt">) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("ai_checks").upsert({
+      workspace_id: workspaceId, site_id: siteId, question_id: c.questionId, engine: c.engine, week: c.week, status: c.status,
+      cited: c.cited, position: c.position, linked: c.linked, competitors: c.competitors, sources: c.sources.slice(0, 20),
+      excerpt: c.excerpt?.slice(0, 1500) ?? null, error: c.error?.slice(0, 500) ?? null, demo: c.demo, checked_at: new Date().toISOString(),
+    }, { onConflict: "question_id,engine,week" }));
+  },
+  async aiVisibilityDue(): Promise<AiDueSite[]> {
+    return ((check(await adminClient().rpc("ai_visibility_due")) as Row[] | null) ?? []).map((r) => ({
+      workspaceId: s(r.workspace_id), siteId: s(r.site_id), maxQuestions: Number(r.max_questions), engines: (r.engines as AiEngineName[]) ?? [],
+    }));
   },
 
   // Publication automatique (tâche de fond, service_role) -------------------

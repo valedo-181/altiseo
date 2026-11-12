@@ -4,6 +4,7 @@
  */
 
 export type Lang = "fr" | "de" | "it" | "en";
+export type PlanCode = "grow" | "scale" | "agence";
 export type PublishMode = "draft" | "publish";
 export type CalendarStatus = "proposed" | "approved" | "generating" | "done" | "failed" | "skipped";
 export type ArticleStatus = "draft" | "scheduled" | "published" | "failed" | "archived";
@@ -16,7 +17,7 @@ export type Workspace = { id: string; name: string; createdAt: string };
 
 export type Subscription = {
   workspaceId: string;
-  planCode: "grow" | "scale";
+  planCode: PlanCode;
   status: "trialing" | "active" | "past_due" | "canceled";
   trialEndsAt: string | null;
   currentPeriodStart: string; // ISO
@@ -204,3 +205,8 @@ export type UrlInspection = {
   lastCrawlAt: string | null; error: string | null; demo: boolean; checkedAt: string;
 };
 export type IndexingDue = { workspaceId: string; siteId: string };
+
+// Offre Agence (supabase/migrations/20261118000000_agence.sql) -----------------------------------
+export type Branding = { agencyName: string; logoUrl: string | null; accent: string | null; contact: string };
+export type SiteReport = { siteId: string; token: string; shared: boolean; clientName: string; clientEmails: string[]; monthly: boolean; lastSentMonth: string | null };
+export type ReportDue = { workspaceId: string; siteId: string; token: string; clientName: string; emails: string[] };

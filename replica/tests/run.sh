@@ -20,3 +20,4 @@ for f in "$HERE"/../../supabase/migrations/*.sql; do "${PSQL[@]}" -f "$f"; done
 "${PSQL[@]}" -f "$HERE/visibilite_ia_test.sql"
 "${PSQL[@]}" -f "$HERE/gardien_test.sql"
 "${PSQL[@]}" -f "$HERE/positions_test.sql"
+"${PSQL[@]}" -f "$HERE/agence_test.sql"

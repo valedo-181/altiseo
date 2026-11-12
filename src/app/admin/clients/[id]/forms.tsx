@@ -30,6 +30,7 @@ export function PlanForm({ id, plan }: { id: string; plan: string | null }) {
           <select id="plan" name="plan" defaultValue={plan ?? "grow"} className="field w-56">
             <option value="grow">Grow · 30 articles / mois</option>
             <option value="scale">Scale · 60 articles / mois</option>
+            <option value="agence">Agence · 25 sites, 300 articles / mois</option>
           </select>
         </div>
         <Submit variant="secondary">Changer</Submit>

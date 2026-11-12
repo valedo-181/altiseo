@@ -9,7 +9,7 @@ import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = { alternates: { canonical: "/tarifs" },
   title: "Tarifs",
-  description: "Deux offres Altiseo en francs suisses : Grow à 99 CHF et Scale à 249 CHF par mois. Essai gratuit de 3 jours, sans carte bancaire.",
+  description: "Trois offres Altiseo en francs suisses : Grow à 99 CHF, Scale à 249 CHF et Agence à 690 CHF par mois. Essai gratuit de 3 jours, sans carte bancaire.",
 };
 
 /** S02 : prix provisoires (supabase/migrations) ; à fixer avec /replica-launch. */
@@ -18,22 +18,26 @@ const PLANS: Plan[] = [
     items: ["30 articles par mois", "1 site", "1 langue", "Calendrier de 30 sujets", "Audit SEO technique", "Visibilité IA : 10 questions (ChatGPT, Perplexity)", "Positions Google : 50 mots-clés", "Envoi sur WordPress"] },
   { code: "scale", name: "Scale", tagline: "Pour plusieurs sites ou plusieurs langues.", month: 249, year: 2241, best: false,
     items: ["60 articles par mois", "3 sites", "4 langues", "Calendrier de 30 sujets par site", "Audit SEO technique", "Visibilité IA : 30 questions par site (4 IA)", "Positions Google : 200 mots-clés par site", "Envoi sur WordPress"] },
+  { code: "agence", name: "Agence", tagline: "Pour les agences qui gèrent les sites de leurs clients.", month: 690, year: 6210, best: false,
+    items: ["300 articles par mois", "25 sites", "4 langues", "Visibilité IA : 30 questions par site (4 IA)", "Positions Google : 100 mots-clés par site", "Rapport mensuel à votre logo", "Lien de lecture pour chaque client", "Envoi du rapport le 1er du mois"] },
 ];
 
-const ROWS: [string, string | boolean, string | boolean][] = [
-  ["Articles par mois", "30", "60"],
-  ["Sites", "1", "3"],
-  ["Langues (français, allemand, italien, anglais)", "1", "4"],
-  ["Calendrier de sujets à valider", true, true],
-  ["Visibilité IA : questions suivies chaque semaine", "10", "30 par site"],
-  ["IA interrogées", "ChatGPT, Perplexity", "ChatGPT, Gemini, Perplexity, Claude"],
-  ["Positions Google : mots-clés suivis chaque semaine", "50", "200 par site"],
-  ["Indexation : état Google des pages + IndexNow (Bing…)", true, true],
-  ["Gardien du site : pannes, certificat SSL, nom de domaine", true, true],
-  ["Vos consignes de ton appliquées à chaque article", true, true],
-  ["Relecture et correction avant publication", true, true],
-  ["Envoi sur WordPress, en brouillon ou publié", true, true],
-  ["Audit SEO technique noté sur 100", true, true],
+const ROWS: [string, string | boolean, string | boolean, string | boolean][] = [
+  ["Articles par mois", "30", "60", "300"],
+  ["Sites", "1", "3", "25"],
+  ["Langues (français, allemand, italien, anglais)", "1", "4", "4"],
+  ["Calendrier de sujets à valider", true, true, true],
+  ["Visibilité IA : questions suivies chaque semaine", "10", "30 par site", "30 par site"],
+  ["IA interrogées", "ChatGPT, Perplexity", "ChatGPT, Gemini, Perplexity, Claude", "Les 4"],
+  ["Positions Google : mots-clés suivis chaque semaine", "50", "200 par site", "100 par site"],
+  ["Indexation : état Google des pages + IndexNow (Bing…)", true, true, true],
+  ["Gardien du site : pannes, certificat SSL, nom de domaine", true, true, true],
+  ["Rapport mensuel enregistrable en PDF", true, true, true],
+  ["Rapport à votre logo, lien et envoi mensuel au client", false, false, true],
+  ["Vos consignes de ton appliquées à chaque article", true, true, true],
+  ["Relecture et correction avant publication", true, true, true],
+  ["Envoi sur WordPress, en brouillon ou publié", true, true, true],
+  ["Audit SEO technique noté sur 100", true, true, true],
 ];
 
 const INCLUDED = [
@@ -45,7 +49,7 @@ const INCLUDED = [
 const FAQ = [
   ["Dois-je donner ma carte bancaire pour l'essai ?", "Non. L'essai de 3 jours se fait sans carte. Vous choisissez une offre seulement si vous voulez continuer."],
   ["Puis-je changer d'offre ou arrêter ?", "Oui, à tout moment. Il n'y a pas de durée minimale en formule mensuelle."],
-  ["Que comprend la formule annuelle ?", "Les mêmes services. Vous payez neuf mois au lieu de douze : 891 CHF par an pour Grow, 2241 CHF pour Scale."],
+  ["Que comprend la formule annuelle ?", "Les mêmes services. Vous payez neuf mois au lieu de douze : 891 CHF par an pour Grow, 2241 CHF pour Scale, 6210 CHF pour Agence."],
   ["Les prix comprennent-ils la TVA ?", "Non, les prix sont indiqués en francs suisses, hors TVA."],
   ["Que deviennent mes articles si j'arrête ?", "Ceux déjà envoyés sur votre site y restent : ils sont à vous."],
 ];
@@ -74,7 +78,7 @@ export default function Pricing() {
               <div className="mx-auto max-w-3xl text-center">
                 <p className="text-sm font-semibold text-accent">Tarifs</p>
                 <h1 className="mt-4 text-[34px] leading-[1.08] md:text-[56px]">Un prix clair pour chaque étape de la montée.</h1>
-                <p className="mx-auto mt-5 max-w-xl text-lg !font-normal leading-relaxed text-text-muted">Essayez 3 jours gratuitement. Ensuite, deux offres en francs suisses, sans engagement.</p>
+                <p className="mx-auto mt-5 max-w-xl text-lg !font-normal leading-relaxed text-text-muted">Essayez 3 jours gratuitement. Ensuite, trois offres en francs suisses, sans engagement.</p>
               </div>
               <div className="mt-10"><Plans plans={PLANS} /></div>
               <p className="mt-6 text-center text-sm text-text-muted">Prix hors TVA.</p>
@@ -84,7 +88,7 @@ export default function Pricing() {
 
         <section aria-labelledby="h-included" className="scene mx-auto max-w-content px-4 py-20 md:px-8">
           <div>
-            <h2 id="h-included" className={H2}>Dans les deux offres</h2>
+            <h2 id="h-included" className={H2}>Dans toutes les offres</h2>
             <ul className="mt-10 grid gap-5 md:grid-cols-3">
               {INCLUDED.map(([t, d], i) => (
                 <li key={t} className="border-t border-border pt-5">
@@ -100,21 +104,23 @@ export default function Pricing() {
         <section aria-labelledby="h-compare" className="scene mx-auto max-w-content px-4 py-20 md:px-8">
           <div>
             <h2 id="h-compare" className={H2}>Comparer les offres</h2>
-            <div className="mt-10 overflow-hidden rounded-xl border border-border bg-surface">
-              <table className="w-full text-left">
+            <div className="relative mt-10 overflow-x-auto rounded-xl border border-border bg-surface">
+              <table className="w-full min-w-[560px] text-left">
                 <thead>
                   <tr className="border-b border-border text-sm">
                     <th scope="col" className="px-4 py-4 font-semibold text-text-muted md:px-6"><span className="sr-only">Service</span></th>
                     <th scope="col" className="w-20 px-2 py-4 text-center font-display font-medium text-accent md:w-36">Grow</th>
                     <th scope="col" className="w-20 px-2 py-4 text-center font-display font-medium md:w-36">Scale</th>
+                    <th scope="col" className="w-20 px-2 py-4 text-center font-display font-medium md:w-36">Agence</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {ROWS.map(([label, g, s]) => (
+                  {ROWS.map(([label, g, s, a]) => (
                     <tr key={label}>
                       <th scope="row" className="px-4 py-4 font-normal md:px-6">{label}</th>
                       <td className="bg-accent/5 px-2 py-4 text-center"><Cell v={g} plan="Grow" /></td>
                       <td className="px-2 py-4 text-center"><Cell v={s} plan="Scale" /></td>
+                      <td className="px-2 py-4 text-center"><Cell v={a} plan="Agence" /></td>
                     </tr>
                   ))}
                 </tbody>

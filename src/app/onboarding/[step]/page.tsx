@@ -48,7 +48,11 @@ export default async function Onboarding({ params }: { params: Promise<{ step: s
       break;
     }
     case "planning": form = <ScheduleStep site={site!} />; break;
-    case "offre": form = <OfferStep />; break;
+    case "offre": {
+      const others = sites.filter((s) => s.id !== site?.id && s.onboardingStep >= 8).length;
+      form = <OfferStep extra={others > 0} />;
+      break;
+    }
   }
   const [title, lead] = TITLES[slug];
   return (

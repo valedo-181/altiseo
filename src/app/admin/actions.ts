@@ -54,7 +54,7 @@ export async function setPlan(_: FormState, f: FormData): Promise<FormState> {
   const id = str(f, "id");
   const plan = str(f, "plan");
   if (!UUID.test(id)) return { error: "Client introuvable." };
-  if (plan !== "grow" && plan !== "scale") return { error: "Offre inconnue." };
+  if (plan !== "grow" && plan !== "scale" && plan !== "agence") return { error: "Offre inconnue." };
   return run("admin_set_plan", { wid: id, plan }, "Offre mise à jour.");
 }
 

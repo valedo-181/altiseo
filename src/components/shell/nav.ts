@@ -1,4 +1,4 @@
-import { Bot, ListChecks, TrendingUp, CalendarDays, ShieldCheck, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
+import { Bot, FileBarChart, Globe, ListChecks, TrendingUp, CalendarDays, ShieldCheck, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
 
 /** Menu de l'application (partagé par le serveur et le navigateur). */
 export const NAV = [
@@ -11,6 +11,8 @@ export const NAV = [
   { href: "/app/visibilite-ia", label: "Visibilité IA", Icon: Bot },
   { href: "/app/audit", label: "Audit", Icon: Gauge },
   { href: "/app/gardien", label: "Gardien du site", Icon: ShieldCheck },
+  { href: "/app/rapport", label: "Rapport client", Icon: FileBarChart },
+  { href: "/app/sites", label: "Sites", Icon: Globe },
   { href: "/app/integrations", label: "Intégrations", Icon: Plug },
   { href: "/app/reglages", label: "Réglages", Icon: Settings },
 ] as const;

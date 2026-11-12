@@ -187,3 +187,20 @@ export type MonitorDue = {
   workspaceId: string; siteId: string; url: string; siteName: string; status: SiteMonitor["status"]; fails: number;
   sslCheckedAt: string | null; domainCheckedAt: string | null; domainSource: SiteMonitor["domainSource"]; emails: string[];
 };
+
+// Positions Google et indexation (supabase/migrations/20261117000000_positions_indexation.sql) -----
+export type RankKeyword = { id: string; siteId: string; phrase: string; source: "manual" | "calendar" | "search_console"; createdAt: string };
+export type RankCheck = {
+  id: string; siteId: string; keywordId: string; week: string; status: "ok" | "error";
+  position: number | null; url: string | null; top: Array<{ rank: number; title: string; domain: string }>;
+  error: string | null; demo: boolean; checkedAt: string;
+};
+export type RankDue = { workspaceId: string; siteId: string; maxKeywords: number };
+export type SiteIndexing = { siteId: string; indexnowKey: string; keyVerifiedAt: string | null; keyError: string | null; autoSubmit: boolean };
+export type IndexNowSubmission = { id: string; siteId: string; urls: string[]; source: "manual" | "article"; statusCode: number | null; ok: boolean; error: string | null; demo: boolean; sentAt: string };
+export type UrlInspection = {
+  id: string; siteId: string; url: string; verdict: "PASS" | "PARTIAL" | "FAIL" | "NEUTRAL" | "VERDICT_UNSPECIFIED" | null;
+  coverage: string | null; indexingState: string | null; pageFetch: string | null; robots: string | null; googleCanonical: string | null;
+  lastCrawlAt: string | null; error: string | null; demo: boolean; checkedAt: string;
+};
+export type IndexingDue = { workspaceId: string; siteId: string };

@@ -335,6 +335,12 @@ async function ownImageBytes(a: Article): Promise<{ bytes: Uint8Array; contentTy
   }
 }
 
+/** Article en ligne : signalé aux moteurs par IndexNow (si la clé du site est en ligne). Import tardif : positions.ts importe ce fichier. */
+async function pingIndexNow(workspaceId: string, siteId: string, url: string) {
+  const { notifyPublished } = await import("./positions");
+  await notifyPublished(workspaceId, siteId, url);
+}
+
 export async function publishArticle(workspaceId: string, articleId: string): Promise<Result<{ mode: "draft" | "publish"; url: string; simulated: boolean; imageMissing?: boolean; target?: "github" }>> {
   const a = await db.getArticle(workspaceId, articleId);
   if (!a) return fail("Article introuvable.");
@@ -364,6 +370,7 @@ export async function publishArticle(workspaceId: string, articleId: string): Pr
     const imageMissing = r.value.imageMissing || Boolean(a.imageUrl && !a.imageDemo && !keep && !file);
     await db.recordPublication(workspaceId, { articleId: a.id, integrationId: integ.id, remoteId: r.value.id, remoteUrl: r.value.url, remoteMediaId: r.value.image, remoteMediaSrc: r.value.image ? a.imageUrl : null, status: "ok", error: null, lastAttemptAt: at });
     await db.updateArticle(workspaceId, a.id, { status: draft ? "draft" : "published", publishedAt: draft ? a.publishedAt : (a.publishedAt ?? at) });
+    if (!draft) await pingIndexNow(workspaceId, site.id, r.value.url);
     return { ok: true, value: { mode: site.publishMode, url: r.value.url, simulated: false, imageMissing, target: "github" } };
   }
   if (!integ.demo && config.cms) {
@@ -396,6 +403,7 @@ export async function publishArticle(workspaceId: string, articleId: string): Pr
       status: site.publishMode === "publish" ? "published" : "draft",
       publishedAt: site.publishMode === "publish" ? (a.publishedAt ?? at) : a.publishedAt,
     });
+    if (site.publishMode === "publish") await pingIndexNow(workspaceId, site.id, r.value.url);
     return { ok: true, value: { mode: site.publishMode, url: r.value.url, simulated: false, imageMissing } };
   }
   const remoteId = prev?.remoteId ?? `demo-${createHash("sha256").update(a.id).digest("hex").slice(0, 6)}`;
@@ -507,4 +515,15 @@ export async function disconnectSearch(workspaceId: string, siteId: string): Pro
     if (refresh) await revokeToken(refresh);
   }
   await db.removeSearchConnection(workspaceId, siteId);
+}
+
+/** Jeton d'accès Google du site (Search Console connecté pour de vrai), pour l'inspection d'URL. */
+export async function googleAccess(workspaceId: string, siteId: string): Promise<Result<{ access: string; property: string }>> {
+  const conn = await db.searchConnection(workspaceId, siteId);
+  if (!conn || conn.demo || !config.search) return fail("Search Console n'est pas connecté.");
+  const refresh = await db.searchSecret(workspaceId, siteId);
+  if (!refresh) return fail("Reconnectez votre compte Google.");
+  const access = await refreshAccess(google(), refresh);
+  if (!access.ok) { await db.markSearchError(workspaceId, siteId, access.error); return fail(access.error); }
+  return { ok: true, value: { access: access.value, property: conn.property } };
 }

@@ -8,6 +8,7 @@ import { userClient } from "@/lib/supabase/server";
 import * as svc from "@/lib/app/service";
 import * as geo from "@/lib/app/geo";
 import * as gardien from "@/lib/app/monitor";
+import * as positions from "@/lib/app/positions";
 import { endSession, rememberSite, startSession } from "@/lib/app/session";
 import { db, Conflict } from "@/lib/data/store";
 import { INSTRUCTIONS_MAX, type Lang } from "@/lib/domain/types";
@@ -383,6 +384,79 @@ export async function saveMonitorSettings(_: FormState, f: FormData): Promise<Fo
   const r = await gardien.saveMonitorSettings(workspace.id, site.id, { enabled: f.get("enabled") === "on", emails: str(f, "emails"), domainExpiresOn: str(f, "domain") });
   revalidatePath("/app/gardien");
   return r.ok ? { ok: "Réglages du gardien enregistrés." } : { error: r.error };
+}
+
+// ---------------------------------------------------------------------------
+// Positions Google
+// ---------------------------------------------------------------------------
+
+export async function addRankKeyword(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await positions.addRankKeyword(workspace.id, site.id, str(f, "phrase"));
+  revalidatePath("/app/positions");
+  return r.ok ? { ok: "Mot-clé ajouté. Sa position sera mesurée au prochain passage." } : { error: r.error };
+}
+
+export async function importRankKeywords(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await positions.importRankKeywords(workspace.id, site.id);
+  revalidatePath("/app/positions");
+  return r.ok ? { ok: `${r.value} mot${r.value > 1 ? "s" : ""}-clé${r.value > 1 ? "s" : ""} ajouté${r.value > 1 ? "s" : ""}. Retirez ceux qui ne vous intéressent pas.` } : { error: r.error };
+}
+
+export async function removeRankKeyword(f: FormData) {
+  const { workspace, site } = await requireSite();
+  const id = str(f, "id");
+  if (id) await db.removeRankKeyword(workspace.id, site.id, id);
+  revalidatePath("/app/positions");
+}
+
+export async function runPositions(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await positions.runPositions(workspace.id, site.id, { budgetMs: 50_000 });
+  revalidatePath("/app/positions");
+  if (!r.ok) return { error: r.error };
+  const v = r.value;
+  if (v.remaining) return { ok: `${v.measured} positions mesurées. Il en reste ${v.remaining} : relancez, ou elles seront mesurées demain matin.` };
+  return { ok: v.errors ? `Terminé : ${v.measured} mots-clés, dont ${v.errors} en erreur.` : `Terminé : ${v.measured} positions mesurées.` };
+}
+
+// ---------------------------------------------------------------------------
+// Indexation
+// ---------------------------------------------------------------------------
+
+export async function verifyIndexNowKey(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await positions.verifyIndexNowKey(workspace.id, site.id);
+  revalidatePath("/app/indexation");
+  return r.ok ? { ok: "Fichier trouvé : vos nouvelles pages seront signalées aux moteurs." } : { error: r.error };
+}
+
+export async function submitIndexNowUrls(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await positions.submitUrls(workspace.id, site.id, str(f, "urls"));
+  revalidatePath("/app/indexation");
+  if (!r.ok) return { error: r.error };
+  const ignored = r.value.rejected.length ? ` ${r.value.rejected.length} adresse${r.value.rejected.length > 1 ? "s" : ""} d'un autre site ignorée${r.value.rejected.length > 1 ? "s" : ""}.` : "";
+  return { ok: `${r.value.sent} page${r.value.sent > 1 ? "s" : ""} : ${r.value.message}${ignored}` };
+}
+
+export async function setIndexNowAuto(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  await positions.setAutoSubmit(workspace.id, site.id, f.get("auto") === "on");
+  revalidatePath("/app/indexation");
+  return { ok: f.get("auto") === "on" ? "Chaque article publié sera signalé." : "Envoi automatique arrêté." };
+}
+
+export async function inspectPages(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const url = str(f, "url");
+  const r = await positions.inspectPages(workspace.id, site.id, url ? { url, freshMs: 0 } : {});
+  revalidatePath("/app/indexation");
+  if (!r.ok) return { error: r.error };
+  const v = r.value;
+  if (!v.checked) return { ok: "Toutes les pages ont été vérifiées il y a moins d'une heure." };
+  return { ok: `${v.checked} page${v.checked > 1 ? "s" : ""} vérifiée${v.checked > 1 ? "s" : ""}${v.errors ? `, dont ${v.errors} en erreur` : ""}${v.skipped ? `. Il en reste ${v.skipped} : relancez.` : "."}` };
 }
 
 // ---------------------------------------------------------------------------

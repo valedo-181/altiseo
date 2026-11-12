@@ -2,6 +2,7 @@
   "regions": ["dub1"],
   "crons": [
     { "path": "/api/cron/daily", "schedule": "0 4 * * *" },
-    { "path": "/api/cron/visibilite-ia", "schedule": "30 5 * * *" }
+    { "path": "/api/cron/visibilite-ia", "schedule": "30 5 * * *" },
+    { "path": "/api/cron/positions", "schedule": "0 6 * * *" }
   ]
 }

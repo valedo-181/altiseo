@@ -2,8 +2,9 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import { AI_PLANS, weekOf } from "@/lib/geo/analyze";
+import { RANK_PLANS } from "@/lib/rank/serp";
 import { localDate } from "@/lib/domain/dates";
 
 /**
@@ -34,9 +35,14 @@ type Doc = {
   monitors: SiteMonitor[];
   monitorDays: Array<MonitorDay & { siteId: string }>;
   incidents: MonitorIncident[];
+  rankKeywords: RankKeyword[];
+  rankChecks: RankCheck[];
+  indexing: SiteIndexing[];
+  submissions: IndexNowSubmission[];
+  inspections: UrlInspection[];
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import type { DueTopic } from "@/lib/jobs/select";
@@ -491,6 +497,110 @@ export const demoDb = {
       }
       return out;
     });
+  },
+
+  // -------------------------------------------------------------------------
+  // Positions Google
+  // -------------------------------------------------------------------------
+
+  async rankPlan(workspaceId: string): Promise<number> {
+    return read((d) => { const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId); return sub ? RANK_PLANS[sub.planCode] ?? 0 : 0; });
+  },
+  async listRankKeywords(workspaceId: string, siteId: string): Promise<RankKeyword[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.rankKeywords.filter((k) => k.siteId === siteId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); });
+  },
+  async addRankKeywords(workspaceId: string, siteId: string, items: Array<{ phrase: string; source: RankKeyword["source"] }>): Promise<number> {
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId);
+      if (!sub) throw new QuotaReached();
+      const max = RANK_PLANS[sub.planCode] ?? 0;
+      let n = 0;
+      for (const it of items) {
+        const mine = d.rankKeywords.filter((k) => k.siteId === siteId);
+        if (mine.some((k) => k.phrase.toLowerCase() === it.phrase.toLowerCase())) continue;
+        if (mine.length >= max) break;
+        d.rankKeywords.push({ id: randomUUID(), siteId, phrase: it.phrase, source: it.source, createdAt: new Date(Date.now() + n).toISOString() });
+        n++;
+      }
+      return n;
+    });
+  },
+  async removeRankKeyword(workspaceId: string, siteId: string, keywordId: string) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.rankKeywords = d.rankKeywords.filter((k) => !(k.id === keywordId && k.siteId === siteId));
+      d.rankChecks = d.rankChecks.filter((c) => c.keywordId !== keywordId);
+    });
+  },
+  async listRankChecks(workspaceId: string, siteId: string, weeks: string[]): Promise<RankCheck[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.rankChecks.filter((c) => c.siteId === siteId && weeks.includes(c.week)); });
+  },
+  async rankWeeks(workspaceId: string, siteId: string, limit = 12): Promise<string[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return [...new Set(d.rankChecks.filter((c) => c.siteId === siteId).map((c) => c.week))].sort().reverse().slice(0, limit); });
+  },
+  async saveRankCheck(workspaceId: string, siteId: string, c: Omit<RankCheck, "id" | "siteId" | "checkedAt">) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.rankChecks = d.rankChecks.filter((x) => !(x.keywordId === c.keywordId && x.week === c.week));
+      d.rankChecks.push({ ...c, id: randomUUID(), siteId, checkedAt: now() });
+    });
+  },
+  async rankDue(): Promise<RankDue[]> {
+    return read((d) => {
+      const week = mondayOf(new Date());
+      const out: RankDue[] = [];
+      for (const site of d.sites) {
+        const sub = d.subscriptions.find((x) => x.workspaceId === site.workspaceId);
+        if (!sub || site.onboardingStep < 8) continue;
+        const live = sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now()));
+        const max = RANK_PLANS[sub.planCode] ?? 0;
+        const missing = d.rankKeywords.some((k) => k.siteId === site.id && !d.rankChecks.some((c) => c.keywordId === k.id && c.week === week));
+        if (live && max && missing) out.push({ workspaceId: site.workspaceId, siteId: site.id, maxKeywords: max });
+      }
+      return out;
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Indexation (IndexNow + inspection d'URL)
+  // -------------------------------------------------------------------------
+
+  async indexingOf(workspaceId: string, siteId: string): Promise<SiteIndexing> {
+    const found = await read((d) => { siteOf(d, siteId, workspaceId); return d.indexing.find((x) => x.siteId === siteId) ?? null; });
+    if (found) return found;
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let x = d.indexing.find((y) => y.siteId === siteId);
+      if (!x) { x = { siteId, indexnowKey: randomUUID().replace(/-/g, ""), keyVerifiedAt: null, keyError: null, autoSubmit: true }; d.indexing.push(x); }
+      return x;
+    });
+  },
+  async saveIndexing(workspaceId: string, siteId: string, patch: Partial<Pick<SiteIndexing, "keyVerifiedAt" | "keyError" | "autoSubmit">>) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const x = d.indexing.find((y) => y.siteId === siteId);
+      if (x) for (const [k, v] of Object.entries(patch)) if (v !== undefined) (x as Record<string, unknown>)[k] = v;
+    });
+  },
+  async addSubmission(workspaceId: string, siteId: string, x: Omit<IndexNowSubmission, "id" | "siteId" | "sentAt">) {
+    await write((d) => { siteOf(d, siteId, workspaceId); d.submissions.push({ ...x, urls: x.urls.slice(0, 100), id: randomUUID(), siteId, sentAt: now() }); });
+  },
+  async listSubmissions(workspaceId: string, siteId: string, limit = 10): Promise<IndexNowSubmission[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.submissions.filter((x) => x.siteId === siteId).sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, limit); });
+  },
+  async listInspections(workspaceId: string, siteId: string): Promise<UrlInspection[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.inspections.filter((x) => x.siteId === siteId).sort((a, b) => a.url.localeCompare(b.url)); });
+  },
+  async saveInspection(workspaceId: string, siteId: string, x: Omit<UrlInspection, "id" | "siteId" | "checkedAt">) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      d.inspections = d.inspections.filter((y) => !(y.siteId === siteId && y.url === x.url));
+      d.inspections.push({ ...x, id: randomUUID(), siteId, checkedAt: now() });
+    });
+  },
+  async indexingDue(): Promise<IndexingDue[]> {
+    return read((d) => d.search.filter((c) => !c.demo).map((c) => ({ workspaceId: d.sites.find((s) => s.id === c.siteId)?.workspaceId ?? "", siteId: c.siteId })).filter((x) => x.workspaceId));
   },
 
   // -------------------------------------------------------------------------

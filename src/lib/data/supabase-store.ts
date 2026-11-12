@@ -2,7 +2,7 @@ import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
 import { supabaseUrl } from "@/lib/supabase/url";
-import type { MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import type { DueTopic } from "@/lib/jobs/select";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
@@ -91,6 +91,23 @@ const toPublication = (r: Row): Publication => ({
 });
 
 
+const toRankKeyword = (r: Row): RankKeyword => ({ id: s(r.id), siteId: s(r.site_id), phrase: s(r.phrase), source: (r.source as RankKeyword["source"]) ?? "manual", createdAt: s(r.created_at) });
+const toRankCheck = (r: Row): RankCheck => ({
+  id: s(r.id), siteId: s(r.site_id), keywordId: s(r.keyword_id), week: s(r.week), status: r.status === "error" ? "error" : "ok",
+  position: (r.position as number) ?? null, url: (r.url as string) ?? null, top: (r.top as RankCheck["top"]) ?? [],
+  error: (r.error as string) ?? null, demo: Boolean(r.demo), checkedAt: s(r.checked_at),
+});
+const toIndexing = (r: Row): SiteIndexing => ({ siteId: s(r.site_id), indexnowKey: s(r.indexnow_key), keyVerifiedAt: (r.key_verified_at as string) ?? null, keyError: (r.key_error as string) ?? null, autoSubmit: r.auto_submit !== false });
+const toSubmission = (r: Row): IndexNowSubmission => ({
+  id: s(r.id), siteId: s(r.site_id), urls: (r.urls as string[]) ?? [], source: r.source === "article" ? "article" : "manual",
+  statusCode: (r.status_code as number) ?? null, ok: Boolean(r.ok), error: (r.error as string) ?? null, demo: Boolean(r.demo), sentAt: s(r.sent_at),
+});
+const toInspection = (r: Row): UrlInspection => ({
+  id: s(r.id), siteId: s(r.site_id), url: s(r.url), verdict: (r.verdict as UrlInspection["verdict"]) ?? null, coverage: (r.coverage as string) ?? null,
+  indexingState: (r.indexing_state as string) ?? null, pageFetch: (r.page_fetch as string) ?? null, robots: (r.robots as string) ?? null,
+  googleCanonical: (r.google_canonical as string) ?? null, lastCrawlAt: (r.last_crawl_at as string) ?? null, error: (r.error as string) ?? null,
+  demo: Boolean(r.demo), checkedAt: s(r.checked_at),
+});
 const toAiQuestion = (r: Row): AiQuestion => ({ id: s(r.id), siteId: s(r.site_id), question: s(r.question), source: r.source === "suggested" ? "suggested" : "manual", createdAt: s(r.created_at) });
 const toAiRun = (r: Row): AiRun => ({
   id: s(r.id), siteId: s(r.site_id), week: s(r.week), status: r.status as AiRun["status"], readiness: (r.readiness as AiRun["readiness"]) ?? null,
@@ -461,6 +478,103 @@ export const supabaseDb = {
     return ((check(await adminClient().rpc("ai_visibility_due")) as Row[] | null) ?? []).map((r) => ({
       workspaceId: s(r.workspace_id), siteId: s(r.site_id), maxQuestions: Number(r.max_questions), engines: (r.engines as AiEngineName[]) ?? [],
     }));
+  },
+
+  // Positions Google ------------------------------------------------------------
+  async rankPlan(workspaceId: string): Promise<number> {
+    const sb = await userClient();
+    const r = check(await sb.from("subscriptions").select("plans(rank_keywords)").eq("workspace_id", workspaceId).maybeSingle()) as Row | null;
+    return Number((r?.plans as Row | null)?.rank_keywords ?? 0);
+  },
+  async listRankKeywords(workspaceId: string, siteId: string): Promise<RankKeyword[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("rank_keywords").select("*").eq("site_id", siteId).order("created_at").order("phrase")) as Row[] | null) ?? []).map(toRankKeyword);
+  },
+  /** Ajoute dans l'ordre ; s'arrête au quota de l'offre, ignore les doublons. Rend le nombre ajouté. */
+  async addRankKeywords(workspaceId: string, siteId: string, items: Array<{ phrase: string; source: RankKeyword["source"] }>): Promise<number> {
+    await siteOf(workspaceId, siteId);
+    let n = 0;
+    for (const it of items) {
+      const r = await adminClient().from("rank_keywords").insert({ workspace_id: workspaceId, site_id: siteId, phrase: it.phrase, source: it.source });
+      if (r.error?.code === "23505") continue;
+      if (r.error?.code === "Q0001") break;
+      check(r);
+      n++;
+    }
+    return n;
+  },
+  async removeRankKeyword(workspaceId: string, siteId: string, keywordId: string) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("rank_keywords").delete().eq("id", keywordId).eq("site_id", siteId).eq("workspace_id", workspaceId));
+  },
+  async listRankChecks(workspaceId: string, siteId: string, weeks: string[]): Promise<RankCheck[]> {
+    await siteOf(workspaceId, siteId);
+    if (!weeks.length) return [];
+    const sb = await userClient();
+    return ((check(await sb.from("rank_checks").select("*").eq("site_id", siteId).in("week", weeks)) as Row[] | null) ?? []).map(toRankCheck);
+  },
+  /** Semaines mesurées, de la plus récente à la plus ancienne. */
+  async rankWeeks(workspaceId: string, siteId: string, limit = 12): Promise<string[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const rows = (check(await sb.from("rank_checks").select("week").eq("site_id", siteId).order("week", { ascending: false }).limit(5000)) as Row[] | null) ?? [];
+    return [...new Set(rows.map((r) => s(r.week)))].slice(0, limit);
+  },
+  async saveRankCheck(workspaceId: string, siteId: string, c: Omit<RankCheck, "id" | "siteId" | "checkedAt">) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("rank_checks").upsert({
+      workspace_id: workspaceId, site_id: siteId, keyword_id: c.keywordId, week: c.week, status: c.status, position: c.position,
+      url: c.url?.slice(0, 2000) ?? null, top: c.top.slice(0, 3), error: c.error?.slice(0, 500) ?? null, demo: c.demo, checked_at: new Date().toISOString(),
+    }, { onConflict: "keyword_id,week" }));
+  },
+  async rankDue(): Promise<RankDue[]> {
+    return ((check(await adminClient().rpc("rank_due")) as Row[] | null) ?? []).map((r) => ({ workspaceId: s(r.workspace_id), siteId: s(r.site_id), maxKeywords: Number(r.max_keywords) }));
+  },
+
+  // Indexation (IndexNow + inspection d'URL) ----------------------------------------
+  async indexingOf(workspaceId: string, siteId: string): Promise<SiteIndexing> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const r = check(await sb.from("site_indexing").select("*").eq("site_id", siteId).maybeSingle()) as Row | null;
+    if (r) return toIndexing(r);
+    // Créée à la première visite : la clé est tirée au hasard par la base.
+    return toIndexing(one(await adminClient().from("site_indexing").upsert({ site_id: siteId, workspace_id: workspaceId }, { onConflict: "site_id", ignoreDuplicates: false }).select("*").single()));
+  },
+  async saveIndexing(workspaceId: string, siteId: string, patch: Partial<Pick<SiteIndexing, "keyVerifiedAt" | "keyError" | "autoSubmit">>) {
+    await siteOf(workspaceId, siteId);
+    const row: Row = {};
+    if (patch.keyVerifiedAt !== undefined) row.key_verified_at = patch.keyVerifiedAt;
+    if (patch.keyError !== undefined) row.key_error = patch.keyError?.slice(0, 300) ?? null;
+    if (patch.autoSubmit !== undefined) row.auto_submit = patch.autoSubmit;
+    if (Object.keys(row).length) check(await adminClient().from("site_indexing").update(row).eq("site_id", siteId).eq("workspace_id", workspaceId));
+  },
+  async addSubmission(workspaceId: string, siteId: string, x: Omit<IndexNowSubmission, "id" | "siteId" | "sentAt">) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("indexnow_submissions").insert({
+      workspace_id: workspaceId, site_id: siteId, urls: x.urls.slice(0, 100), source: x.source, status_code: x.statusCode, ok: x.ok, error: x.error?.slice(0, 300) ?? null, demo: x.demo,
+    }));
+  },
+  async listSubmissions(workspaceId: string, siteId: string, limit = 10): Promise<IndexNowSubmission[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("indexnow_submissions").select("*").eq("site_id", siteId).order("sent_at", { ascending: false }).limit(limit)) as Row[] | null) ?? []).map(toSubmission);
+  },
+  async listInspections(workspaceId: string, siteId: string): Promise<UrlInspection[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("url_inspections").select("*").eq("site_id", siteId).order("url").limit(500)) as Row[] | null) ?? []).map(toInspection);
+  },
+  async saveInspection(workspaceId: string, siteId: string, x: Omit<UrlInspection, "id" | "siteId" | "checkedAt">) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("url_inspections").upsert({
+      workspace_id: workspaceId, site_id: siteId, url: x.url.slice(0, 2000), verdict: x.verdict, coverage: x.coverage, indexing_state: x.indexingState,
+      page_fetch: x.pageFetch, robots: x.robots, google_canonical: x.googleCanonical, last_crawl_at: x.lastCrawlAt, error: x.error?.slice(0, 300) ?? null,
+      demo: x.demo, checked_at: new Date().toISOString(),
+    }, { onConflict: "site_id,url" }));
+  },
+  async indexingDue(): Promise<IndexingDue[]> {
+    return ((check(await adminClient().rpc("indexing_due")) as Row[] | null) ?? []).map((r) => ({ workspaceId: s(r.workspace_id), siteId: s(r.site_id) }));
   },
 
   // Gardien du site -------------------------------------------------------------

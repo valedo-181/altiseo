@@ -9,6 +9,7 @@ import * as svc from "@/lib/app/service";
 import * as geo from "@/lib/app/geo";
 import * as gardien from "@/lib/app/monitor";
 import * as positions from "@/lib/app/positions";
+import * as agence from "@/lib/app/report";
 import { endSession, rememberSite, startSession } from "@/lib/app/session";
 import { db, Conflict } from "@/lib/data/store";
 import { INSTRUCTIONS_MAX, type Lang } from "@/lib/domain/types";
@@ -457,6 +458,53 @@ export async function inspectPages(_: FormState, f: FormData): Promise<FormState
   const v = r.value;
   if (!v.checked) return { ok: "Toutes les pages ont été vérifiées il y a moins d'une heure." };
   return { ok: `${v.checked} page${v.checked > 1 ? "s" : ""} vérifiée${v.checked > 1 ? "s" : ""}${v.errors ? `, dont ${v.errors} en erreur` : ""}${v.skipped ? `. Il en reste ${v.skipped} : relancez.` : "."}` };
+}
+
+// ---------------------------------------------------------------------------
+// Sites et offre Agence
+// ---------------------------------------------------------------------------
+
+export async function addSite(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace } = await requireAccount();
+  const r = await agence.addSite(workspace.id, str(f, "url"));
+  if (!r.ok) return { error: r.error };
+  await rememberSite(r.value.id);
+  redirect(r.value.onboardingStep >= 8 ? "/app" : `/onboarding/${ONBOARDING_STEPS[Math.max(1, r.value.onboardingStep - 1)].slug}`);
+}
+
+async function requireAgency() {
+  const ctx = await requireSite();
+  if (!agence.isAgency(ctx.subscription)) return null;
+  return ctx;
+}
+
+export async function saveBranding(_: FormState, f: FormData): Promise<FormState> {
+  const ctx = await requireAgency();
+  if (!ctx) return { error: "La marque de l'agence fait partie de l'offre Agence." };
+  try {
+    const r = await agence.saveBranding(ctx.workspace.id, { agencyName: str(f, "agencyName"), logoUrl: str(f, "logoUrl"), accent: str(f, "accent"), contact: str(f, "contact") });
+    revalidatePath("/app/rapport");
+    return r.ok ? { ok: "Marque de l'agence enregistrée : elle apparaît sur tous les rapports." } : { error: r.error };
+  } catch {
+    return { error: "Seuls les propriétaires et administrateurs de l'espace peuvent changer la marque." };
+  }
+}
+
+export async function saveReportSettings(_: FormState, f: FormData): Promise<FormState> {
+  const ctx = await requireAgency();
+  if (!ctx) return { error: "Le lien pour vos clients fait partie de l'offre Agence." };
+  const r = await agence.saveReportSettings(ctx.workspace.id, ctx.site.id, { shared: f.get("shared") === "on", clientName: str(f, "clientName"), emails: str(f, "emails"), monthly: f.get("monthly") === "on" });
+  revalidatePath("/app/rapport");
+  return r.ok ? { ok: "Réglages du rapport enregistrés." } : { error: r.error };
+}
+
+export async function newReportLink(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const ctx = await requireAgency();
+  if (!ctx) return { error: "Le lien pour vos clients fait partie de l'offre Agence." };
+  await db.reportOf(ctx.workspace.id, ctx.site.id);
+  await db.saveReport(ctx.workspace.id, ctx.site.id, { newToken: true });
+  revalidatePath("/app/rapport");
+  return { ok: "Nouveau lien créé : l'ancien ne marche plus." };
 }
 
 // ---------------------------------------------------------------------------

@@ -105,7 +105,15 @@ export function ScheduleStep({ site }: { site: Site }) {
   );
 }
 
-export function OfferStep() {
+export function OfferStep({ extra = false }: { extra?: boolean }) {
+  if (extra) {
+    return (
+      <ActionForm action={A.onboardingFinish} className="space-y-6">
+        <div className="card"><p className="font-semibold">Ce site s'ajoute à votre offre actuelle</p><p className="mt-1 text-sm text-text-muted">Il partage le quota d'articles du mois avec vos autres sites. Rien à payer en plus.</p></div>
+        <Actions label="Terminer et préparer les sujets" back="/onboarding/planning" />
+      </ActionForm>
+    );
+  }
   return (
     <ActionForm action={A.onboardingFinish} className="space-y-6">
       <div className="card ring-2 ring-accent">

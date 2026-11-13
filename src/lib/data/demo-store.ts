@@ -2,9 +2,10 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import { AI_PLANS, weekOf } from "@/lib/geo/analyze";
 import { RANK_PLANS } from "@/lib/rank/serp";
+import { SITE_LIMITS } from "@/lib/domain/plan-limits";
 import { localDate } from "@/lib/domain/dates";
 
 /**
@@ -40,9 +41,11 @@ type Doc = {
   indexing: SiteIndexing[];
   submissions: IndexNowSubmission[];
   inspections: UrlInspection[];
+  branding: Array<Branding & { workspaceId: string }>;
+  reports: SiteReport[];
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [], branding: [], reports: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import type { DueTopic } from "@/lib/jobs/select";
@@ -175,6 +178,8 @@ export const demoDb = {
   async createSite(workspaceId: string, data: Omit<Site, "id" | "workspaceId" | "createdAt">) {
     return write((d) => {
       if (d.sites.some((s) => s.workspaceId === workspaceId && s.url === data.url)) throw new Conflict("Ce site est déjà dans votre espace.");
+      const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId);
+      if (sub && d.sites.filter((s) => s.workspaceId === workspaceId).length >= (SITE_LIMITS[sub.planCode] ?? 1)) throw new QuotaReached();
       const site: Site = { ...data, id: randomUUID(), workspaceId, createdAt: now() };
       d.sites.push(site);
       return site;
@@ -496,6 +501,58 @@ export const demoDb = {
         out.push({ workspaceId: site.workspaceId, siteId: site.id, maxQuestions: plan.maxQuestions, engines: [...plan.engines] });
       }
       return out;
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Offre Agence
+  // -------------------------------------------------------------------------
+
+  async sitesAllowed(workspaceId: string): Promise<number> {
+    return read((d) => { const sub = d.subscriptions.find((x) => x.workspaceId === workspaceId); return sub ? SITE_LIMITS[sub.planCode] ?? 1 : 1; });
+  },
+  async branding(workspaceId: string): Promise<Branding> {
+    return read((d) => { const b = d.branding.find((x) => x.workspaceId === workspaceId); return b ? { agencyName: b.agencyName, logoUrl: b.logoUrl, accent: b.accent, contact: b.contact } : { agencyName: "", logoUrl: null, accent: null, contact: "" }; });
+  },
+  async saveBranding(workspaceId: string, b: Branding) {
+    await write((d) => {
+      d.branding = d.branding.filter((x) => x.workspaceId !== workspaceId);
+      d.branding.push({ ...b, workspaceId });
+    });
+  },
+  async reportOf(workspaceId: string, siteId: string): Promise<SiteReport> {
+    const found = await read((d) => { siteOf(d, siteId, workspaceId); return d.reports.find((x) => x.siteId === siteId) ?? null; });
+    if (found) return found;
+    return write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let r = d.reports.find((x) => x.siteId === siteId);
+      if (!r) { r = { siteId, token: (randomUUID() + randomUUID()).replace(/-/g, ""), shared: false, clientName: "", clientEmails: [], monthly: false, lastSentMonth: null }; d.reports.push(r); }
+      return r;
+    });
+  },
+  async saveReport(workspaceId: string, siteId: string, patch: Partial<Pick<SiteReport, "shared" | "clientName" | "clientEmails" | "monthly" | "lastSentMonth">> & { newToken?: boolean }) {
+    await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      const r = d.reports.find((x) => x.siteId === siteId);
+      if (!r) return;
+      const { newToken, ...rest } = patch;
+      for (const [k, v] of Object.entries(rest)) if (v !== undefined) (r as Record<string, unknown>)[k] = v;
+      if (newToken) r.token = (randomUUID() + randomUUID()).replace(/-/g, "");
+    });
+  },
+  async reportByToken(token: string): Promise<{ workspaceId: string; siteId: string } | null> {
+    return read((d) => {
+      const r = d.reports.find((x) => x.token === token && x.shared);
+      const site = r && d.sites.find((x) => x.id === r.siteId);
+      return r && site ? { workspaceId: site.workspaceId, siteId: site.id } : null;
+    });
+  },
+  async reportsDue(): Promise<ReportDue[]> {
+    return read((d) => {
+      const month = mondayOf(new Date()).slice(0, 8) + "01";
+      return d.reports.filter((r) => r.monthly && r.shared && r.clientEmails.length && (!r.lastSentMonth || r.lastSentMonth < month)).map((r) => ({
+        workspaceId: d.sites.find((x) => x.id === r.siteId)?.workspaceId ?? "", siteId: r.siteId, token: r.token, clientName: r.clientName, emails: r.clientEmails,
+      })).filter((x) => x.workspaceId);
     });
   },
 

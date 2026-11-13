@@ -9,9 +9,10 @@ export type AiEngine = (typeof AI_ENGINES)[number];
 export const ENGINE_LABEL: Record<AiEngine, string> = { chatgpt: "ChatGPT", gemini: "Gemini", perplexity: "Perplexity", claude: "Claude" };
 
 /** Ce que comprend chaque offre (identique à la table plans, pour le mode démo). */
-export const AI_PLANS: Record<"grow" | "scale", { maxQuestions: number; engines: AiEngine[] }> = {
+export const AI_PLANS: Record<"grow" | "scale" | "agence", { maxQuestions: number; engines: AiEngine[] }> = {
   grow: { maxQuestions: 10, engines: ["chatgpt", "perplexity"] },
   scale: { maxQuestions: 30, engines: ["chatgpt", "gemini", "perplexity", "claude"] },
+  agence: { maxQuestions: 30, engines: ["chatgpt", "gemini", "perplexity", "claude"] },
 };
 
 export type AiAnswer = { text: string; sources: string[] };

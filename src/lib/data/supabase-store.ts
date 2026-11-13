@@ -2,7 +2,7 @@ import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
 import { supabaseUrl } from "@/lib/supabase/url";
-import type { IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import type { DueTopic } from "@/lib/jobs/select";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
@@ -91,6 +91,11 @@ const toPublication = (r: Row): Publication => ({
 });
 
 
+const toBranding = (r: Row | null): Branding => ({ agencyName: s(r?.agency_name), logoUrl: (r?.logo_url as string) ?? null, accent: (r?.accent as string) ?? null, contact: s(r?.contact) });
+const toReport = (r: Row): SiteReport => ({
+  siteId: s(r.site_id), token: s(r.token), shared: Boolean(r.shared), clientName: s(r.client_name), clientEmails: (r.client_emails as string[]) ?? [],
+  monthly: Boolean(r.monthly), lastSentMonth: (r.last_sent_month as string) ?? null,
+});
 const toRankKeyword = (r: Row): RankKeyword => ({ id: s(r.id), siteId: s(r.site_id), phrase: s(r.phrase), source: (r.source as RankKeyword["source"]) ?? "manual", createdAt: s(r.created_at) });
 const toRankCheck = (r: Row): RankCheck => ({
   id: s(r.id), siteId: s(r.site_id), keywordId: s(r.keyword_id), week: s(r.week), status: r.status === "error" ? "error" : "ok",
@@ -477,6 +482,53 @@ export const supabaseDb = {
   async aiVisibilityDue(): Promise<AiDueSite[]> {
     return ((check(await adminClient().rpc("ai_visibility_due")) as Row[] | null) ?? []).map((r) => ({
       workspaceId: s(r.workspace_id), siteId: s(r.site_id), maxQuestions: Number(r.max_questions), engines: (r.engines as AiEngineName[]) ?? [],
+    }));
+  },
+
+  // Offre Agence ----------------------------------------------------------------
+  async sitesAllowed(workspaceId: string): Promise<number> {
+    const sb = await userClient();
+    const r = check(await sb.from("subscriptions").select("plans(sites)").eq("workspace_id", workspaceId).maybeSingle()) as Row | null;
+    return Number((r?.plans as Row | null)?.sites ?? 1);
+  },
+  async branding(workspaceId: string): Promise<Branding> {
+    const sb = await userClient();
+    return toBranding(check(await sb.from("workspace_branding").select("*").eq("workspace_id", workspaceId).maybeSingle()) as Row | null);
+  },
+  /** Réservé aux propriétaires et administrateurs de l'espace (vérifié ici, l'écriture passe par le serveur). */
+  async saveBranding(workspaceId: string, b: Branding) {
+    const sb = await userClient();
+    const ok = check(await sb.rpc("is_admin", { wid: workspaceId }));
+    if (!ok) throw new AccessDenied();
+    check(await adminClient().from("workspace_branding").upsert({ workspace_id: workspaceId, agency_name: b.agencyName || null, logo_url: b.logoUrl, accent: b.accent, contact: b.contact || null }, { onConflict: "workspace_id" }));
+  },
+  async reportOf(workspaceId: string, siteId: string): Promise<SiteReport> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const r = check(await sb.from("site_reports").select("*").eq("site_id", siteId).maybeSingle()) as Row | null;
+    if (r) return toReport(r);
+    return toReport(one(await adminClient().from("site_reports").upsert({ site_id: siteId, workspace_id: workspaceId }, { onConflict: "site_id" }).select("*").single()));
+  },
+  async saveReport(workspaceId: string, siteId: string, patch: Partial<Pick<SiteReport, "shared" | "clientName" | "clientEmails" | "monthly" | "lastSentMonth">> & { newToken?: boolean }) {
+    await siteOf(workspaceId, siteId);
+    const row: Row = {};
+    if (patch.shared !== undefined) row.shared = patch.shared;
+    if (patch.clientName !== undefined) row.client_name = patch.clientName || null;
+    if (patch.clientEmails !== undefined) row.client_emails = patch.clientEmails.slice(0, 3);
+    if (patch.monthly !== undefined) row.monthly = patch.monthly;
+    if (patch.lastSentMonth !== undefined) row.last_sent_month = patch.lastSentMonth;
+    if (patch.newToken) row.token = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "");
+    if (Object.keys(row).length) check(await adminClient().from("site_reports").update(row).eq("site_id", siteId).eq("workspace_id", workspaceId));
+  },
+  /** Lien du client (sans compte) : le site du jeton, seulement si l'agence a activé le partage. */
+  async reportByToken(token: string): Promise<{ workspaceId: string; siteId: string } | null> {
+    if (!/^[0-9a-f]{64}$/.test(token)) return null;
+    const r = check(await adminClient().from("site_reports").select("site_id, workspace_id, shared").eq("token", token).maybeSingle()) as Row | null;
+    return r && r.shared ? { workspaceId: s(r.workspace_id), siteId: s(r.site_id) } : null;
+  },
+  async reportsDue(): Promise<ReportDue[]> {
+    return ((check(await adminClient().rpc("reports_due")) as Row[] | null) ?? []).map((r) => ({
+      workspaceId: s(r.workspace_id), siteId: s(r.site_id), token: s(r.token), clientName: s(r.client_name), emails: (r.emails as string[]) ?? [],
     }));
   },
 

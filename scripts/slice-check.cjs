@@ -259,6 +259,70 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   assert(true, "page signalée à IndexNow et inscrite dans l'historique");
   await shot("S28");
 
+  console.log("S29 rapport du mois et sites (offre Grow)");
+  await page.goto(BASE + "/app/rapport");
+  await page.getByText("Rapports à votre marque : offre Agence").waitFor();
+  await page.getByRole("link", { name: "Voir le rapport du mois" }).click();
+  await page.getByRole("heading", { name: /^Rapport de \S+ \d{4}$/ }).waitFor();
+  assert(await page.getByRole("heading", { name: "Positions dans Google" }).count() === 1, "rapport du mois : positions, IA, disponibilité");
+  assert(await page.getByRole("button", { name: "Télécharger en PDF" }).count() === 1, "bouton PDF");
+  await shot("S29");
+  await page.goto(BASE + "/app/sites");
+  await page.getByText("1 site sur 1 compris dans votre offre.", { exact: false }).waitFor();
+  assert(await page.getByRole("button", { name: "Ajouter ce site" }).isDisabled(), "Grow : pas de 2e site");
+
+  if (process.env.ALTISEO_DEMO_FILE) {
+    console.log("S30 offre Agence (marque, lien client, 2e site)");
+    const fs = require("node:fs");
+    const doc = JSON.parse(fs.readFileSync(process.env.ALTISEO_DEMO_FILE, "utf8"));
+    const me = doc.users.find((u) => u.email === email);
+    const ws = doc.memberships.find((m) => m.userId === me.id).workspaceId;
+    doc.subscriptions.find((x) => x.workspaceId === ws).planCode = "agence";
+    fs.writeFileSync(process.env.ALTISEO_DEMO_FILE, JSON.stringify(doc));
+    await page.goto(BASE + "/app/rapport");
+    await page.getByRole("heading", { name: "Marque de l'agence" }).waitFor();
+    await page.getByLabel("Adresse du logo").fill("http://pas-sur.ch/logo.png");
+    await page.getByRole("button", { name: "Enregistrer la marque" }).click();
+    await page.getByText("L'adresse du logo doit commencer par https://").waitFor();
+    assert(true, "logo en http refusé");
+    await page.getByLabel("Adresse du logo").fill("");
+    await page.getByLabel("Nom de l'agence").fill("Agence Lac & Web");
+    await page.getByLabel("Couleur de l'agence").fill("#7C3AED");
+    await page.getByRole("button", { name: "Enregistrer la marque" }).click();
+    await page.getByText("Marque de l'agence enregistrée").waitFor();
+    await page.getByLabel("Lien actif pour le client").check();
+    await page.getByLabel("Adresses du client").fill("client@exemple.ch");
+    await page.getByLabel("Envoyer le rapport chaque mois").check();
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await page.getByText("Réglages du rapport enregistrés.").waitFor();
+    await page.getByText(/Prochain envoi le 1er/).waitFor();
+    const link = await page.locator("code").first().textContent();
+    assert(/\/rapport\/[0-9a-f]{64}$/.test(link), "lien secret du client");
+    const guest = await (await browser.newContext()).newPage();
+    await guest.goto(link.replace(/^https?:\/\/[^/]+/, BASE));
+    await guest.getByText("Agence Lac & Web").first().waitFor();
+    assert(await guest.getByRole("heading", { name: /^Rapport de / }).count() === 1, "le client lit son rapport sans compte, à la marque de l'agence");
+    if (SHOTS) await guest.screenshot({ path: `${SHOTS}/S30-client.png`, fullPage: true });
+    await page.getByRole("button", { name: "Créer un nouveau lien" }).click();
+    await page.getByText("Nouveau lien créé").waitFor();
+    const r2 = await guest.goto(link.replace(/^https?:\/\/[^/]+/, BASE));
+    assert(r2.status() === 404, "l'ancien lien ne marche plus");
+    await guest.context().close();
+    await shot("S30");
+    await page.goto(BASE + "/app/sites");
+    await page.getByText("1 site sur 25").waitFor();
+    await page.getByLabel("Adresse du nouveau site").fill("client-deux.ch");
+    await page.getByRole("button", { name: "Ajouter ce site" }).click();
+    await page.waitForURL("**/onboarding/activite");
+    assert(true, "2e site ajouté, configuration guidée");
+    // On retire ce 2e site (pas fini) pour que la suite du parcours retombe sur le premier.
+    const d2 = JSON.parse(fs.readFileSync(process.env.ALTISEO_DEMO_FILE, "utf8"));
+    d2.sites = d2.sites.filter((x) => !x.url.includes("client-deux.ch"));
+    fs.writeFileSync(process.env.ALTISEO_DEMO_FILE, JSON.stringify(d2));
+    await page.goto(BASE + "/app/sites");
+    await page.getByText("1 site sur 25").waitFor();
+  }
+
   console.log("Sécurité : un autre compte ne voit rien");
   const other = await browser.newContext();
   const p2 = await other.newPage();
@@ -276,8 +340,8 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   console.log("Téléphone (390 px) et clavier");
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const pm = await mob.newPage();
-  pm.on("pageerror", (e) => errors.push("mobile: " + e.message));
-  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia", "/app/gardien", "/app/positions", "/app/indexation"]) {
+  pm.on("pageerror", (e) => errors.push("mobile " + pm.url().replace(BASE, "") + " : " + e.message));
+  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia", "/app/gardien", "/app/positions", "/app/indexation", "/app/rapport", "/app/sites", "/rapport/apercu", "/tarifs"]) {
     await pm.goto(BASE + path);
     const w = await pm.evaluate(() => document.documentElement.scrollWidth);
     assert(w <= 390, `${path} sans défilement horizontal à 390 px (${w})`);

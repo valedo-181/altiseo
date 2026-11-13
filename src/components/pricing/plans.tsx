@@ -8,7 +8,7 @@ export type Plan = { code: string; name: string; tagline: string; month: number;
 
 const chf = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
-/** Choix mensuel / annuel et les deux offres. L'offre recommandée porte un liseré lumineux. */
+/** Choix mensuel / annuel et les offres. L'offre recommandée porte un liseré lumineux. */
 export function Plans({ plans }: { plans: Plan[] }) {
   const [yearly, setYearly] = useState(false);
   return (
@@ -22,7 +22,7 @@ export function Plans({ plans }: { plans: Plan[] }) {
         ))}
       </div>
 
-      <div className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
+      <div className={`mx-auto mt-10 grid gap-6 md:grid-cols-2 ${plans.length > 2 ? "max-w-6xl lg:grid-cols-3" : "max-w-4xl"}`}>
         {plans.map((p) => {
           const perMonth = yearly ? p.year / 12 : p.month;
           return (

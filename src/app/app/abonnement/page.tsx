@@ -5,6 +5,8 @@ import { requireSite } from "@/lib/app/context";
 
 export const metadata: Metadata = { title: "Abonnement" };
 
+const PLAN_NAME: Record<string, string> = { grow: "Grow", scale: "Scale", agence: "Agence" };
+
 /** S22 : abonnement (démo : essai sans paiement ; Stripe viendra avec le backend). */
 export default async function Billing() {
   const { subscription } = await requireSite();
@@ -12,7 +14,7 @@ export default async function Billing() {
     <>
       <PageHeader title="Abonnement" />
       <Card className="max-w-xl space-y-3">
-        <div className="flex items-center justify-between"><p className="text-lg font-semibold">Grow</p>
+        <div className="flex items-center justify-between"><p className="text-lg font-semibold">{PLAN_NAME[subscription?.planCode ?? "grow"] ?? "Grow"}</p>
           <span className="pill bg-info-soft text-info">{subscription?.status === "trialing" ? "Essai" : subscription?.status}</span></div>
         {subscription?.trialEndsAt && <p className="text-sm text-text-muted">Fin de l'essai : {new Date(subscription.trialEndsAt).toLocaleDateString("fr-CH", { dateStyle: "long" })}</p>}
         <div>

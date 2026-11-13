@@ -14,7 +14,7 @@ export const DEPTH = 50;
 export const PHRASE_MIN = 2, PHRASE_MAX = 120;
 
 /** Mots-clés suivis par offre (même chiffres que la migration 20261117000000). */
-export const RANK_PLANS: Record<"grow" | "scale", number> = { grow: 50, scale: 200 };
+export const RANK_PLANS: Record<"grow" | "scale" | "agence", number> = { grow: 50, scale: 200, agence: 100 };
 
 export const dataForSeoConfigured = () => Boolean(process.env.DATAFORSEO_LOGIN?.trim() && process.env.DATAFORSEO_PASSWORD?.trim());
 

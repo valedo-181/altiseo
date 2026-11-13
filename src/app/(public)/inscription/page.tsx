@@ -16,7 +16,7 @@ export default function SignUp() {
       aside={{ quote: "Un blog qui avance, même quand vous n'avez pas le temps.", points: ["Trente sujets tirés de votre activité", "Un article par jour, dans votre ton", "Vous relisez avant que rien ne paraisse"] }}
     >
       <SignUpForm />
-      <p className="mt-4 text-xs text-text-muted">{demoMode ? "Mode démo : pas de mot de passe, l'e-mail suffit." : "Pas de mot de passe à retenir : nous vous envoyons un lien de connexion par e-mail."}</p>
+      <p className="mt-4 text-xs text-text-muted">{demoMode ? "Mode démo : pas de mot de passe, l'e-mail suffit." : "Pas de mot de passe à retenir : nous vous envoyons un code à 6 chiffres (et un lien) par e-mail."}</p>
     </AuthShell>
   );
 }

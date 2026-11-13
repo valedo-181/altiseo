@@ -8,7 +8,7 @@ import { ServicesFilm } from "./film";
 
 export const metadata: Metadata = { alternates: { canonical: "/services" },
   title: "Nos services",
-  description: "Ce qu'Altiseo fait pour votre site, étape par étape : un mois de sujets, un article par jour avec sa photo, publication automatique, puis positions Google, visibilité IA, statistiques et rapport.",
+  description: "Ce qu'Altiseo fait pour votre blog, étape par étape : lecture de votre site, un mois de sujets, un article par jour, publication sur votre site, audit SEO.",
 };
 
 /** Page des services, en mode sombre quel que soit le réglage de l'appareil (ambiance « film »). */
@@ -19,7 +19,7 @@ export default function Services() {
       <ServicesFilm />
       <section aria-labelledby="h-more" className="mx-auto max-w-content px-4 pb-24 pt-8 md:px-8">
         <h2 id="h-more" className="max-w-3xl font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]">Et pendant que le blog avance</h2>
-        <p className="mt-5 max-w-2xl text-lg font-normal leading-relaxed text-text-muted">Les cinq étapes font vivre votre blog. Ces outils, compris dans toutes les offres, publient à votre place, mesurent le résultat et surveillent votre site.</p>
+        <p className="mt-5 max-w-2xl text-lg font-normal leading-relaxed text-text-muted">Les cinq étapes font vivre votre blog. Ces outils, compris dans toutes les offres, travaillent en plus pour vous.</p>
         <FeatureGroups />
         <div className="mt-14 flex flex-wrap gap-3">
           <Link href="/inscription" className={buttonClass("primary", "lg")}>Essayer 3 jours gratuitement</Link>

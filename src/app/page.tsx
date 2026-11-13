@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, Check, Gauge, PenLine } from "lucide-react";
-import { FeatureGroups } from "@/components/home/features";
+import { FeatureGroups, readyFeatures } from "@/components/home/features";
 import { HeroVideo } from "@/components/home/hero-video";
 import { RevealScope } from "@/components/home/reveal";
+import { isReady } from "@/lib/readiness";
 import { PublicHeader } from "@/components/public-header";
 import { SiteFooter } from "@/components/site-footer";
 import { buttonClass } from "@/components/ui/button";
@@ -12,13 +13,13 @@ import { StatusPill } from "@/components/ui/status";
 
 export const metadata: Metadata = { alternates: { canonical: "/" },
   title: "Altiseo : votre blog SEO, écrit et publié pour vous",
-  description: "Altiseo écrit et publie un article par jour sur votre site, avec sa photo, puis mesure le résultat : positions Google, visibilité dans les IA, visites. Essai gratuit de 3 jours.",
+  description: "Altiseo prépare vos sujets, écrit un article par jour dans votre ton et l'envoie sur votre site. Vous relisez, vous publiez. Essai gratuit de 3 jours.",
 };
 
 const BENEFITS = [
   { Icon: CalendarDays, title: "Un mois de sujets en une minute", text: "Trente idées d'articles tirées de votre activité, chacune avec la recherche Google qu'elle vise. Vous gardez, changez ou sautez." },
-  { Icon: PenLine, title: "Un article par jour, avec sa photo", text: "Des textes structurés dans votre ton, avec des liens vers vos autres pages et une image créée pour le sujet. Rien n'est inventé." },
-  { Icon: Gauge, title: "Des chiffres qui montrent le résultat", text: "Votre place dans Google, ce que les IA disent de vous, vos visites, et un audit noté sur 100 qui dit quoi corriger." },
+  { Icon: PenLine, title: isReady("images") ? "Un article par jour, avec sa photo" : "Un article par jour, dans votre ton", text: isReady("images") ? "Des textes structurés dans votre ton, avec des liens vers vos autres pages et une image créée pour le sujet. Rien n'est inventé." : "Des textes structurés, avec des liens vers vos autres pages. Vos consignes s'appliquent à chacun, et rien n'est inventé." },
+  { Icon: Gauge, title: "Un audit qui dit quoi corriger", text: "Votre site noté sur 100, les problèmes du plus grave au moins grave, et la correction à faire pour chacun." },
 ];
 
 const STEPS = ["Nous lisons votre site", "Vous validez un mois de sujets", "Un article s'écrit chaque jour", "Vous relisez, il part sur votre site", "L'audit vous dit quoi corriger"];
@@ -27,8 +28,8 @@ const FAQ = [
   ["Google pénalise-t-il les articles écrits par une IA ?", "Google juge l'utilité d'un contenu, pas la façon dont il est écrit. Ce qu'il sanctionne, c'est le contenu produit en masse sans valeur. C'est pourquoi Altiseo envoie par défaut chaque article en brouillon : vous le relisez et l'ajustez avant qu'il paraisse."],
   ["Faut-il installer quelque chose sur mon site ?", "Non. Pour WordPress, vous créez un « mot de passe d'application » dans votre profil et vous le collez dans Altiseo. Aucun plugin."],
   ["Avec quels sites cela fonctionne-t-il ?", "WordPress, et les sites statiques dont le code est sur GitHub. Webflow et Shopify sont en préparation."],
-  ["Les images des articles sont-elles comprises ?", "Oui. Chaque article reçoit une photo réaliste créée pour son sujet, sans texte ni visage reconnaissable. Vous pouvez la changer ou la retirer avant publication."],
-  ["Les articles partent-ils tout seuls ?", "Seulement ceux dont vous avez approuvé le sujet. Chaque matin, l'article du jour s'écrit et part sur votre site, en brouillon par défaut : vous choisissez s'il doit être publié directement."],
+  ...(isReady("images") ? [["Les images des articles sont-elles comprises ?", "Oui. Chaque article reçoit une photo réaliste créée pour son sujet, sans texte ni visage reconnaissable. Vous pouvez la changer ou la retirer avant publication."]] : []),
+  ...(isReady("autopublish") ? [["Les articles partent-ils tout seuls ?", "Seulement ceux dont vous avez approuvé le sujet. Chaque matin, l'article du jour s'écrit et part sur votre site, en brouillon par défaut : vous choisissez s'il doit être publié directement."]] : []),
   ["Dans quelles langues les articles sont-ils écrits ?", "Français, allemand, italien ou anglais. L'offre Grow comprend une langue, les offres Scale et Agence quatre."],
   ["Que se passe-t-il après les 3 jours d'essai ?", "Rien ne vous est facturé sans votre accord : l'essai se fait sans carte bancaire. Vos sujets et vos articles restent à vous."],
 ];
@@ -44,6 +45,8 @@ function Word({ text }: { text: string }) {
 
 /** S01 : page d'accueil. Toujours sombre ; le fond est une vidéo en boucle (image fixe si animations réduites). */
 export default function Home() {
+  // Le titre de la section des fonctions suit ce qui est réellement branché (src/lib/readiness.ts).
+  const measures = readyFeatures().some((g) => g.group === "Mesurer");
   return (
     <div data-theme="dark" className="bg-bg text-text">
       <RevealScope>
@@ -138,8 +141,8 @@ export default function Home() {
         {/* Tout ce qui va avec */}
         <section aria-labelledby="h-features" className="scene mx-auto max-w-content px-4 py-24 md:px-8">
           <div>
-            <h2 id="h-features" className="max-w-3xl font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]"><Word text="Écrire ne suffit pas : Altiseo mesure et surveille aussi" /></h2>
-            <p className="mt-5 max-w-2xl text-lg font-normal leading-relaxed text-text-muted">Les articles font monter votre site. Ces outils vous le prouvent, et vous préviennent quand quelque chose ne va pas.</p>
+            <h2 id="h-features" className="max-w-3xl font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]"><Word text={measures ? "Écrire ne suffit pas : Altiseo mesure et surveille aussi" : "Et tout ce qui va avec"} /></h2>
+            <p className="mt-5 max-w-2xl text-lg font-normal leading-relaxed text-text-muted">{measures ? "Les articles font monter votre site. Ces outils vous le prouvent, et vous préviennent quand quelque chose ne va pas." : "Compris dans toutes les offres, sans rien installer."}</p>
             <FeatureGroups />
           </div>
         </section>

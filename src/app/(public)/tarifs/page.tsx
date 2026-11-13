@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Check, Minus } from "lucide-react";
 import { RevealScope } from "@/components/home/reveal";
 import { Plans, type Plan } from "@/components/pricing/plans";
+import { isReady, type Feature } from "@/lib/readiness";
 import { PublicHeader } from "@/components/public-header";
 import { SiteFooter } from "@/components/site-footer";
 import { buttonClass } from "@/components/ui/button";
@@ -13,7 +14,7 @@ export const metadata: Metadata = { alternates: { canonical: "/tarifs" },
 };
 
 /** S02 : prix provisoires (supabase/migrations) ; à fixer avec /replica-launch. */
-const PLANS: Plan[] = [
+const ALL_PLANS: Plan[] = [
   { code: "grow", name: "Grow", tagline: "Pour faire vivre le blog d'un site.", month: 99, year: 891, best: true,
     items: ["30 articles par mois", "1 site", "1 langue", "Calendrier de 30 sujets", "Audit SEO technique", "Visibilité IA : 10 questions (ChatGPT, Perplexity)", "Positions Google : 50 mots-clés", "Une photo par article", "Envoi automatique sur WordPress ou site statique"] },
   { code: "scale", name: "Scale", tagline: "Pour plusieurs sites ou plusieurs langues.", month: 249, year: 2241, best: false,
@@ -21,28 +22,37 @@ const PLANS: Plan[] = [
   { code: "agence", name: "Agence", tagline: "Pour les agences qui gèrent les sites de leurs clients.", month: 690, year: 6210, best: false,
     items: ["300 articles par mois", "25 sites", "4 langues", "Visibilité IA : 30 questions par site (4 IA)", "Positions Google : 100 mots-clés par site", "Rapport mensuel à votre logo", "Lien de lecture pour chaque client", "Envoi du rapport le 1er du mois"] },
 ];
+/** Les lignes des cartes qui annoncent une fonction non branchée sont retirées. */
+const HIDE: Array<[string, Feature]> = [["Visibilité IA", "aiVisibility"], ["Positions Google", "positions"], ["Une photo par article", "images"], ["Envoi du rapport", "reportEmail"]];
+const PLANS: Plan[] = ALL_PLANS.map((p) => ({
+  ...p,
+  items: p.items.filter((i) => !HIDE.some(([start, f]) => i.startsWith(start) && !isReady(f)))
+    .map((i) => (i.startsWith("Envoi automatique") && !isReady("autopublish") ? i.replace("Envoi automatique", "Envoi") : i)),
+}));
 
-const ROWS: [string, string | boolean, string | boolean, string | boolean][] = [
+/** Dernière colonne : la fonction concernée. Une ligne dont la fonction n'est pas branchée est masquée. */
+const ALL_ROWS: [string, string | boolean, string | boolean, string | boolean, Feature?][] = [
   ["Articles par mois", "30", "60", "300"],
   ["Sites", "1", "3", "25"],
   ["Langues (français, allemand, italien, anglais)", "1", "4", "4"],
   ["Calendrier de sujets à valider", true, true, true],
-  ["Une photo réaliste créée pour chaque article", true, true, true],
-  ["Publication automatique chaque matin (sujets approuvés)", true, true, true],
-  ["Mots-clés : clics et positions depuis Google Search Console", true, true, true],
-  ["Visibilité IA : questions suivies chaque semaine", "10", "30 par site", "30 par site"],
-  ["IA interrogées", "ChatGPT, Perplexity", "ChatGPT, Gemini, Perplexity, Claude", "Les 4"],
-  ["Positions Google : mots-clés suivis chaque semaine", "50", "200 par site", "100 par site"],
-  ["Indexation : état Google des pages + IndexNow (Bing…)", true, true, true],
-  ["Gardien du site : pannes, certificat SSL, nom de domaine", true, true, true],
-  ["Statistiques de visites sans cookies (sans bandeau)", true, true, true],
-  ["Rapport mensuel enregistrable en PDF", true, true, true],
-  ["Rapport à votre logo, lien et envoi mensuel au client", false, false, true],
+  ["Une photo réaliste créée pour chaque article", true, true, true, "images"],
+  ["Publication automatique chaque matin (sujets approuvés)", true, true, true, "autopublish"],
+  ["Mots-clés : clics et positions depuis Google Search Console", true, true, true, "keywords"],
+  ["Visibilité IA : questions suivies chaque semaine", "10", "30 par site", "30 par site", "aiVisibility"],
+  ["IA interrogées", "ChatGPT, Perplexity", "ChatGPT, Gemini, Perplexity, Claude", "Les 4", "aiVisibility"],
+  ["Positions Google : mots-clés suivis chaque semaine", "50", "200 par site", "100 par site", "positions"],
+  ["Indexation : état Google des pages + IndexNow (Bing…)", true, true, true, "indexing"],
+  ["Gardien du site : pannes, certificat SSL, nom de domaine", true, true, true, "guardian"],
+  ["Statistiques de visites sans cookies (sans bandeau)", true, true, true, "stats"],
+  ["Rapport mensuel enregistrable en PDF", true, true, true, "report"],
+  [isReady("reportEmail") ? "Rapport à votre logo, lien et envoi mensuel au client" : "Rapport à votre logo et lien de lecture pour le client", false, false, true, "report"],
   ["Vos consignes de ton appliquées à chaque article", true, true, true],
   ["Relecture et correction avant publication", true, true, true],
   ["Envoi sur WordPress ou site statique (GitHub), en brouillon ou publié", true, true, true],
   ["Audit SEO technique noté sur 100", true, true, true],
 ];
+const ROWS = ALL_ROWS.filter((r) => !r[4] || isReady(r[4]));
 
 const INCLUDED = [
   ["3 jours d'essai", "Sans carte bancaire. Vos trente premiers sujets arrivent en une minute."],

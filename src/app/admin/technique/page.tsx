@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { adminContext, loadFailures } from "@/lib/admin/context";
-import { config, cronMode } from "@/lib/config";
+import { READINESS } from "@/lib/readiness";
 import { MfaScreen } from "../mfa";
 import { dayTime } from "../ui";
 import { Retry } from "./retry";
@@ -14,14 +14,8 @@ export const metadata: Metadata = { title: "Suivi technique" };
 
 const KIND = { publication: "Envoi au site refusé", topic: "Rédaction en échec", job: "Tâche bloquée" } as const;
 
-/** Présence des réglages seulement : aucune valeur n'est lue ni affichée. */
-const SERVICES = (): Array<[string, boolean, string]> => [
-  ["Rédaction (Claude)", config.ai, "ANTHROPIC_API_KEY"],
-  ["Envoi à WordPress", config.cms, "ENCRYPTION_KEY"],
-  ["Images des articles (Higgsfield)", config.images, "HIGGSFIELD_KEY_ID"],
-  ["Mots-clés (Google Search Console)", config.search, "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et ENCRYPTION_KEY"],
-  [`Publication automatique (${cronMode === "hourly" ? "chaque heure" : "chaque jour"})`, Boolean(process.env.CRON_SECRET?.trim()), "CRON_SECRET"],
-];
+/** Présence des réglages seulement : aucune valeur n'est lue ni affichée. Même liste que le site public. */
+const SERVICES = (): Array<[string, boolean, string]> => Object.values(READINESS).map((r) => [r.label, r.ready, r.needs]);
 
 /** Ce qui a échoué chez les clients, du plus récent au plus ancien. */
 export default async function Technical() {
@@ -33,7 +27,7 @@ export default async function Technical() {
       <PageHeader title="Suivi technique" lead="Envois refusés par le site du client, rédactions en échec et tâches bloquées. 200 lignes au plus." />
       <Card>
         <h2 className="font-semibold">Services branchés</h2>
-        <p className="mt-1 text-xs text-text-muted">Ce que ce serveur voit de ses réglages (variables Vercel). Après un changement dans Vercel, il faut redéployer.</p>
+        <p className="mt-1 text-xs text-text-muted">Ce que ce serveur voit de ses réglages (variables Vercel). Une fonction non branchée est masquée sur le site public ; elle y revient au déploiement suivant une fois ses variables ajoutées.</p>
         <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           {SERVICES().map(([name, on, off]) => (
             <li key={name} className="flex items-start gap-2">

@@ -8,7 +8,7 @@ import { SignInForm } from "../auth-forms";
 export const metadata: Metadata = { alternates: { canonical: "/connexion" }, title: "Connexion", description: "Connectez-vous à Altiseo pour retrouver votre calendrier, vos articles et le suivi de vos mots-clés." };
 
 const ERRORS: Record<string, string> = {
-  lien: "Ce lien de connexion n'est plus valable (il sert une seule fois, pendant une heure, et dans le même navigateur). Demandez un nouveau code ci-dessous : il marche sur tous les appareils.",
+  lien: "Ce lien de connexion n'est plus valable (il sert une seule fois, pendant une heure, et seul le dernier e-mail reçu compte). Demandez un nouveau code ci-dessous.",
   espace: "Votre compte est ouvert, mais l'espace n'a pas pu être créé. Réessayez ; si cela continue, écrivez-nous.",
 };
 

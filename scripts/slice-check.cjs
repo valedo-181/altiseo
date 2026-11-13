@@ -323,6 +323,64 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
     await page.getByText("1 site sur 25").waitFor();
   }
 
+  console.log("S31 statistiques sans cookies (script sur un site, robots ignorés)");
+  {
+    await page.goto(BASE + "/app/statistiques");
+    await page.getByRole("heading", { name: "Statistiques", exact: true }).waitFor();
+    await page.getByText("Pas encore de visite reçue").waitFor();
+    const code = await page.locator("pre code").first().textContent();
+    const key = (code.match(/data-site="([0-9a-f]{32})"/) || [])[1];
+    assert(Boolean(key), "code à coller avec la clé du site");
+    // Le site du client et Altiseo sur de faux domaines publics (Chromium bloque un site public qui appelle localhost).
+    const html = code.replace(/src="[^"]+\/s\.js"/, 'src="https://altiseo-test.ch/s.js"');
+    const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    const visit = async (viewport, paths) => {
+      const c = await browser.newContext({ userAgent: UA + (viewport.width < 768 ? " Mobile" : ""), viewport });
+      await c.addInitScript(() => Object.defineProperty(navigator, "webdriver", { get: () => false }));
+      await c.route("https://client-test.ch/**", (r) => r.fulfill({ contentType: "text/html", body: `<!doctype html><html><head><title>Client</title>${html}</head><body>Page</body></html>` }));
+      await c.route("https://altiseo-test.ch/**", async (r) => r.fulfill({ response: await r.fetch({ url: BASE + new URL(r.request().url()).pathname }) }));
+      const v = await c.newPage();
+      for (const [path, referer] of paths) {
+        const hit = v.waitForEvent("requestfinished", (r) => r.url().endsWith("/api/collect"));
+        await v.goto("https://client-test.ch" + path, referer ? { referer } : undefined);
+        await hit;
+      }
+      await c.close();
+    };
+    await visit({ width: 1280, height: 800 }, [["/", "https://www.google.ch/"], ["/tarifs/", null]]);
+    await visit({ width: 390, height: 844 }, [["/?utm_source=newsletter", null]]);
+    await page.request.post(BASE + "/api/collect", { data: JSON.stringify({ k: key, u: "https://client-test.ch/", r: "", w: 1280 }), headers: { "content-type": "text/plain", "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" } });
+    await page.reload();
+    await page.getByText("Visites reçues").waitFor();
+    const kpi = async (label) => (await page.locator(".card", { hasText: label }).first().locator("p.text-2xl").textContent()).trim();
+    assert(await kpi("Visiteurs, 30 jours") === "2", "2 visiteurs (le robot n'est pas compté)");
+    assert(await kpi("Pages vues") === "3", "3 pages vues");
+    assert(await page.locator(".card", { hasText: "D'où viennent les visiteurs" }).getByText("Google", { exact: true }).count() === 1, "provenance Google");
+    assert(await page.locator(".card", { hasText: "D'où viennent les visiteurs" }).getByText("Newsletter", { exact: true }).count() === 1, "provenance utm_source");
+    assert(await page.locator(".card", { hasText: "Pages les plus vues" }).getByText("/tarifs", { exact: true }).count() === 1, "page /tarifs (sans barre finale)");
+    assert(await page.locator(".card", { hasText: "Appareils" }).getByText("Téléphone", { exact: true }).count() === 1, "appareil téléphone");
+    await page.getByRole("button", { name: "Vérifier l'installation" }).click();
+    await page.getByText("Mode démo : installation considérée comme faite.").waitFor();
+    await page.getByRole("link", { name: "7 jours" }).click();
+    await page.waitForURL("**/app/statistiques?p=7");
+    assert(await kpi("Visiteurs, 7 jours") === "2", "période 7 jours");
+    await shot("S31");
+    await page.goto(BASE + "/app/rapport");
+    await page.getByRole("link", { name: "Voir le rapport du mois" }).click();
+    await page.getByRole("heading", { name: "Visiteurs du site" }).waitFor();
+    assert(true, "rapport du mois : visiteurs du site");
+    await page.goto(BASE + "/app/statistiques");
+    await page.getByLabel("Compter les visites").uncheck();
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await page.getByText("Mesure des visites arrêtée").first().waitFor();
+    await page.request.post(BASE + "/api/collect", { data: JSON.stringify({ k: key, u: "https://client-test.ch/x", r: "", w: 1280 }), headers: { "content-type": "text/plain", "user-agent": UA } });
+    await page.reload();
+    assert(await kpi("Pages vues") === "3", "mesure arrêtée : rien de compté");
+    await page.getByLabel("Compter les visites").check();
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await page.getByText("Mesure des visites active.").waitFor();
+  }
+
   console.log("Sécurité : un autre compte ne voit rien");
   const other = await browser.newContext();
   const p2 = await other.newPage();
@@ -341,15 +399,20 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const pm = await mob.newPage();
   pm.on("pageerror", (e) => errors.push("mobile " + pm.url().replace(BASE, "") + " : " + e.message));
-  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia", "/app/gardien", "/app/positions", "/app/indexation", "/app/rapport", "/app/sites", "/rapport/apercu", "/tarifs"]) {
+  for (const path of ["/app", "/app/calendrier", "/app/articles", articleUrl.replace(BASE, ""), "/app/integrations", "/app/reglages", "/app/mots-cles", "/app/visibilite-ia", "/app/gardien", "/app/statistiques", "/app/positions", "/app/indexation", "/app/rapport", "/app/sites", "/rapport/apercu", "/tarifs"]) {
     await pm.goto(BASE + path);
     const w = await pm.evaluate(() => document.documentElement.scrollWidth);
+    if (w > 390) {
+      const wide = await pm.evaluate(() => [...document.querySelectorAll("body *")].filter((e) => e.getBoundingClientRect().right > 392).slice(-1).map((e) => { const out = []; for (let x = e; x && x !== document.body; x = x.parentElement) out.push(`${x.tagName.toLowerCase()}.${String(x.className).slice(0, 50)} (${Math.round(x.getBoundingClientRect().width)})`); return out.join(" < "); }).join(""));
+      console.log("    trop large :", wide);
+    }
     assert(w <= 390, `${path} sans défilement horizontal à 390 px (${w})`);
   }
   if (SHOTS) { await pm.goto(BASE + "/app/calendrier"); await pm.screenshot({ path: `${SHOTS}/S12-mobile.png`, fullPage: true }); }
   if (SHOTS) {
     await pm.goto(BASE + "/app/mots-cles"); await pm.screenshot({ path: `${SHOTS}/S24-mobile.png`, fullPage: true });
     await pm.goto(BASE + "/app/visibilite-ia"); await pm.screenshot({ path: `${SHOTS}/S25-mobile.png`, fullPage: true });
+    await pm.goto(BASE + "/app/statistiques"); await pm.screenshot({ path: `${SHOTS}/S31-mobile.png`, fullPage: true });
     await pm.goto(BASE + "/app/positions"); await pm.screenshot({ path: `${SHOTS}/S27-mobile.png`, fullPage: true });
     const dark = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2, storageState: await ctx.storageState() });
     const pd = await dark.newPage();

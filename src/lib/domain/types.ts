@@ -210,3 +210,9 @@ export type IndexingDue = { workspaceId: string; siteId: string };
 export type Branding = { agencyName: string; logoUrl: string | null; accent: string | null; contact: string };
 export type SiteReport = { siteId: string; token: string; shared: boolean; clientName: string; clientEmails: string[]; monthly: boolean; lastSentMonth: string | null };
 export type ReportDue = { workspaceId: string; siteId: string; token: string; clientName: string; emails: string[] };
+
+/** Statistiques sans cookies (lot E) */
+export type SiteAnalytics = { siteId: string; siteKey: string; enabled: boolean; lastHitAt: string | null };
+export type StatsDay = { day: string; visitors: number; pageviews: number };
+export type StatsKind = "page" | "source" | "device" | "country";
+export type StatsDim = { day: string; kind: StatsKind; value: string; visitors: number; pageviews: number };

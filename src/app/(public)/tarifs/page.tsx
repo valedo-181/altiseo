@@ -32,6 +32,7 @@ const ROWS: [string, string | boolean, string | boolean, string | boolean][] = [
   ["Positions Google : mots-clés suivis chaque semaine", "50", "200 par site", "100 par site"],
   ["Indexation : état Google des pages + IndexNow (Bing…)", true, true, true],
   ["Gardien du site : pannes, certificat SSL, nom de domaine", true, true, true],
+  ["Statistiques de visites sans cookies (sans bandeau)", true, true, true],
   ["Rapport mensuel enregistrable en PDF", true, true, true],
   ["Rapport à votre logo, lien et envoi mensuel au client", false, false, true],
   ["Vos consignes de ton appliquées à chaque article", true, true, true],

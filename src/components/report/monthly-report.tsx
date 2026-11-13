@@ -123,6 +123,17 @@ export function MonthlyReportView({ r, months }: { r: MonthlyReport; months?: Ar
         </section>
       )}
 
+      {r.visits && (
+        <section aria-labelledby="r-visits" className="space-y-3 break-inside-avoid">
+          <h2 id="r-visits" className="text-lg" style={{ color: accent }}>Visiteurs du site</h2>
+          <div className="grid gap-3 sm:grid-cols-2 print:grid-cols-2">
+            <Stat label="Visiteurs" value={r.visits.visitors.toLocaleString("fr-CH")}><Delta now={r.visits.visitors} before={r.visits.prevVisitors} /></Stat>
+            <Stat label="Pages vues" value={r.visits.pageviews.toLocaleString("fr-CH")}><Delta now={r.visits.pageviews} before={r.visits.prevPageviews} /></Stat>
+          </div>
+          <p className="text-xs text-text-muted">Mesurés sans cookies : un visiteur est compté une fois par jour.</p>
+        </section>
+      )}
+
       <section aria-labelledby="r-uptime" className="space-y-2 break-inside-avoid">
         <h2 id="r-uptime" className="text-lg" style={{ color: accent }}>Disponibilité du site</h2>
         <p className="text-sm">{r.uptime.checks ? <>Vérifié toutes les 5 minutes ({r.uptime.checks.toLocaleString("fr-CH")} vérifications) : disponible {r.uptime.pct == null ? "—" : `${nf.format(r.uptime.pct)} %`} du temps{r.uptime.incidents ? `, ${r.uptime.incidents} panne${r.uptime.incidents > 1 ? "s" : ""} pour ${duration(r.uptime.downtimeMs)} au total` : ", sans panne"}.</> : "Pas encore de vérification ce mois-ci."}</p>

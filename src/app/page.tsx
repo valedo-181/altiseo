@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, Check, Gauge, PenLine } from "lucide-react";
+import { FeatureGroups } from "@/components/home/features";
 import { HeroVideo } from "@/components/home/hero-video";
 import { RevealScope } from "@/components/home/reveal";
 import { PublicHeader } from "@/components/public-header";
@@ -11,13 +12,13 @@ import { StatusPill } from "@/components/ui/status";
 
 export const metadata: Metadata = { alternates: { canonical: "/" },
   title: "Altiseo : votre blog SEO, écrit et publié pour vous",
-  description: "Altiseo prépare vos sujets, écrit un article par jour dans votre ton et l'envoie sur votre site. Vous relisez, vous publiez. Essai gratuit de 3 jours.",
+  description: "Altiseo écrit et publie un article par jour sur votre site, avec sa photo, puis mesure le résultat : positions Google, visibilité dans les IA, visites. Essai gratuit de 3 jours.",
 };
 
 const BENEFITS = [
   { Icon: CalendarDays, title: "Un mois de sujets en une minute", text: "Trente idées d'articles tirées de votre activité, chacune avec la recherche Google qu'elle vise. Vous gardez, changez ou sautez." },
-  { Icon: PenLine, title: "Un article par jour, dans votre ton", text: "Des textes structurés, avec des liens vers vos autres pages. Vos consignes s'appliquent à chacun, et rien n'est inventé." },
-  { Icon: Gauge, title: "Un audit qui dit quoi corriger", text: "Votre site noté sur 100, les problèmes du plus grave au moins grave, et la correction à faire pour chacun." },
+  { Icon: PenLine, title: "Un article par jour, avec sa photo", text: "Des textes structurés dans votre ton, avec des liens vers vos autres pages et une image créée pour le sujet. Rien n'est inventé." },
+  { Icon: Gauge, title: "Des chiffres qui montrent le résultat", text: "Votre place dans Google, ce que les IA disent de vous, vos visites, et un audit noté sur 100 qui dit quoi corriger." },
 ];
 
 const STEPS = ["Nous lisons votre site", "Vous validez un mois de sujets", "Un article s'écrit chaque jour", "Vous relisez, il part sur votre site", "L'audit vous dit quoi corriger"];
@@ -25,8 +26,10 @@ const STEPS = ["Nous lisons votre site", "Vous validez un mois de sujets", "Un a
 const FAQ = [
   ["Google pénalise-t-il les articles écrits par une IA ?", "Google juge l'utilité d'un contenu, pas la façon dont il est écrit. Ce qu'il sanctionne, c'est le contenu produit en masse sans valeur. C'est pourquoi Altiseo envoie par défaut chaque article en brouillon : vous le relisez et l'ajustez avant qu'il paraisse."],
   ["Faut-il installer quelque chose sur mon site ?", "Non. Pour WordPress, vous créez un « mot de passe d'application » dans votre profil et vous le collez dans Altiseo. Aucun plugin."],
-  ["Avec quels sites cela fonctionne-t-il ?", "WordPress aujourd'hui. Webflow, Shopify et les sites faits sur mesure sont en préparation."],
-  ["Dans quelles langues les articles sont-ils écrits ?", "Français, allemand, italien ou anglais. L'offre Grow comprend une langue, l'offre Scale quatre."],
+  ["Avec quels sites cela fonctionne-t-il ?", "WordPress, et les sites statiques dont le code est sur GitHub. Webflow et Shopify sont en préparation."],
+  ["Les images des articles sont-elles comprises ?", "Oui. Chaque article reçoit une photo réaliste créée pour son sujet, sans texte ni visage reconnaissable. Vous pouvez la changer ou la retirer avant publication."],
+  ["Les articles partent-ils tout seuls ?", "Seulement ceux dont vous avez approuvé le sujet. Chaque matin, l'article du jour s'écrit et part sur votre site, en brouillon par défaut : vous choisissez s'il doit être publié directement."],
+  ["Dans quelles langues les articles sont-ils écrits ?", "Français, allemand, italien ou anglais. L'offre Grow comprend une langue, les offres Scale et Agence quatre."],
   ["Que se passe-t-il après les 3 jours d'essai ?", "Rien ne vous est facturé sans votre accord : l'essai se fait sans carte bancaire. Vos sujets et vos articles restent à vous."],
 ];
 
@@ -132,12 +135,21 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Tout ce qui va avec */}
+        <section aria-labelledby="h-features" className="scene mx-auto max-w-content px-4 py-24 md:px-8">
+          <div>
+            <h2 id="h-features" className="max-w-3xl font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]"><Word text="Écrire ne suffit pas : Altiseo mesure et surveille aussi" /></h2>
+            <p className="mt-5 max-w-2xl text-lg font-normal leading-relaxed text-text-muted">Les articles font monter votre site. Ces outils vous le prouvent, et vous préviennent quand quelque chose ne va pas.</p>
+            <FeatureGroups />
+          </div>
+        </section>
+
         {/* Tarifs */}
         <section aria-labelledby="h-pricing" className="scene mx-auto max-w-content px-4 py-24 md:px-8">
           <div>
-            <h2 id="h-pricing" className="font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]"><Word text="Deux offres, sans engagement" /></h2>
-            <div className="mt-10 grid max-w-3xl gap-5 md:grid-cols-2">
-              {[["Grow", "99", "30 articles par mois, 1 langue, 1 site", true], ["Scale", "249", "60 articles par mois, 4 langues, 3 sites", false]].map(([name, price, text, best]) => (
+            <h2 id="h-pricing" className="font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]"><Word text="Trois offres, sans engagement" /></h2>
+            <div className="mt-10 grid gap-5 md:grid-cols-3">
+              {[["Grow", "99", "30 articles par mois, 1 langue, 1 site", true], ["Scale", "249", "60 articles par mois, 4 langues, 3 sites", false], ["Agence", "690", "300 articles par mois, 25 sites, rapports à votre logo", false]].map(([name, price, text, best]) => (
                 <div key={name as string} className={`rounded-xl border bg-surface p-6 ${best ? "border-accent" : "border-border"}`}>
                   <div className="flex items-start justify-between"><h3 className="text-lg">{name}</h3>{best && <span className="pill bg-accent-soft text-accent">Recommandée</span>}</div>
                   <p className="mt-3 font-display text-2xl font-medium">{price} CHF <span className="font-sans text-sm font-normal text-text-muted">par mois</span></p>

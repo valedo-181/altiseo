@@ -15,9 +15,9 @@ export const metadata: Metadata = { alternates: { canonical: "/tarifs" },
 /** S02 : prix provisoires (supabase/migrations) ; à fixer avec /replica-launch. */
 const PLANS: Plan[] = [
   { code: "grow", name: "Grow", tagline: "Pour faire vivre le blog d'un site.", month: 99, year: 891, best: true,
-    items: ["30 articles par mois", "1 site", "1 langue", "Calendrier de 30 sujets", "Audit SEO technique", "Visibilité IA : 10 questions (ChatGPT, Perplexity)", "Positions Google : 50 mots-clés", "Envoi sur WordPress"] },
+    items: ["30 articles par mois", "1 site", "1 langue", "Calendrier de 30 sujets", "Audit SEO technique", "Visibilité IA : 10 questions (ChatGPT, Perplexity)", "Positions Google : 50 mots-clés", "Une photo par article", "Envoi automatique sur WordPress ou site statique"] },
   { code: "scale", name: "Scale", tagline: "Pour plusieurs sites ou plusieurs langues.", month: 249, year: 2241, best: false,
-    items: ["60 articles par mois", "3 sites", "4 langues", "Calendrier de 30 sujets par site", "Audit SEO technique", "Visibilité IA : 30 questions par site (4 IA)", "Positions Google : 200 mots-clés par site", "Envoi sur WordPress"] },
+    items: ["60 articles par mois", "3 sites", "4 langues", "Calendrier de 30 sujets par site", "Audit SEO technique", "Visibilité IA : 30 questions par site (4 IA)", "Positions Google : 200 mots-clés par site", "Une photo par article", "Envoi automatique sur WordPress ou site statique"] },
   { code: "agence", name: "Agence", tagline: "Pour les agences qui gèrent les sites de leurs clients.", month: 690, year: 6210, best: false,
     items: ["300 articles par mois", "25 sites", "4 langues", "Visibilité IA : 30 questions par site (4 IA)", "Positions Google : 100 mots-clés par site", "Rapport mensuel à votre logo", "Lien de lecture pour chaque client", "Envoi du rapport le 1er du mois"] },
 ];
@@ -27,6 +27,9 @@ const ROWS: [string, string | boolean, string | boolean, string | boolean][] = [
   ["Sites", "1", "3", "25"],
   ["Langues (français, allemand, italien, anglais)", "1", "4", "4"],
   ["Calendrier de sujets à valider", true, true, true],
+  ["Une photo réaliste créée pour chaque article", true, true, true],
+  ["Publication automatique chaque matin (sujets approuvés)", true, true, true],
+  ["Mots-clés : clics et positions depuis Google Search Console", true, true, true],
   ["Visibilité IA : questions suivies chaque semaine", "10", "30 par site", "30 par site"],
   ["IA interrogées", "ChatGPT, Perplexity", "ChatGPT, Gemini, Perplexity, Claude", "Les 4"],
   ["Positions Google : mots-clés suivis chaque semaine", "50", "200 par site", "100 par site"],
@@ -37,7 +40,7 @@ const ROWS: [string, string | boolean, string | boolean, string | boolean][] = [
   ["Rapport à votre logo, lien et envoi mensuel au client", false, false, true],
   ["Vos consignes de ton appliquées à chaque article", true, true, true],
   ["Relecture et correction avant publication", true, true, true],
-  ["Envoi sur WordPress, en brouillon ou publié", true, true, true],
+  ["Envoi sur WordPress ou site statique (GitHub), en brouillon ou publié", true, true, true],
   ["Audit SEO technique noté sur 100", true, true, true],
 ];
 
@@ -127,7 +130,7 @@ export default function Pricing() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-4 text-sm text-text-muted">Webflow, Shopify et les sites faits sur mesure sont en préparation.</p>
+            <p className="mt-4 text-sm text-text-muted">Webflow et Shopify sont en préparation.</p>
           </div>
         </section>
 

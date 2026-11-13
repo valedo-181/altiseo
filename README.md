@@ -47,7 +47,7 @@ Lucide (ISC).
 
 ```bash
 npm run build
-ALTISEO_DEMO=1 ALTISEO_DEMO_FILE=/tmp/altiseo-demo.json npx next start -p 3100 &
+ALTISEO_DEMO=1 ALTISEO_SESSION_SECRET=un-secret-local-de-32-caracteres-au-moins ALTISEO_DEMO_FILE=/tmp/altiseo-demo.json npx next start -p 3100 &
 node scripts/slice-check.cjs       # 35 contrôles dans un vrai navigateur (Playwright)
 ```
 

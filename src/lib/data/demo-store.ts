@@ -2,7 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { SiteAnalytics, StatsDay, StatsDim, StatsKind, Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { AdDraft, SiteAnalytics, StatsDay, StatsDim, StatsKind, Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import { AI_PLANS, weekOf } from "@/lib/geo/analyze";
 import { RANK_PLANS } from "@/lib/rank/serp";
 import { SITE_LIMITS } from "@/lib/domain/plan-limits";
@@ -43,6 +43,7 @@ type Doc = {
   submissions: IndexNowSubmission[];
   inspections: UrlInspection[];
   branding: Array<Branding & { workspaceId: string }>;
+  adDrafts: AdDraft[];
   reports: SiteReport[];
   analytics: Array<SiteAnalytics & { workspaceId: string }>;
   statsDays: Array<StatsDay & { siteId: string }>;
@@ -50,7 +51,7 @@ type Doc = {
   statsSeen: Array<{ siteId: string; day: string; visitor: string }>;
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [], branding: [], reports: [], analytics: [], statsDays: [], statsDims: [], statsSeen: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [], branding: [], adDrafts: [], reports: [], analytics: [], statsDays: [], statsDims: [], statsSeen: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import type { DueTopic } from "@/lib/jobs/select";
@@ -788,6 +789,40 @@ export const demoDb = {
         out.push({ workspaceId: site.workspaceId, siteId: site.id, url: site.url, siteName: site.name || site.url, status: m.status, fails: m.fails, sslCheckedAt: m.sslCheckedAt, domainCheckedAt: m.domainCheckedAt, domainSource: m.domainSource, emails: m.alertEmails.length ? m.alertEmails : owners.slice(0, 3) });
       }
       return out;
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Publicités (annonces préparées pour un article)
+  // -------------------------------------------------------------------------
+
+  async listAdDrafts(workspaceId: string, siteId: string): Promise<AdDraft[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.adDrafts.filter((x) => x.siteId === siteId); });
+  },
+  async adDraftOf(workspaceId: string, articleId: string): Promise<AdDraft | null> {
+    return read((d) => {
+      const x = d.adDrafts.find((v) => v.articleId === articleId);
+      if (!x) return null;
+      siteOf(d, x.siteId, workspaceId);
+      return x;
+    });
+  },
+  /** Remplace les annonces de l'article ; elles repassent en « à valider ». */
+  async saveAdDraft(workspaceId: string, draft: Pick<AdDraft, "articleId" | "siteId" | "google" | "meta" | "landingUrl" | "demo">): Promise<AdDraft> {
+    return write((d) => {
+      siteOf(d, draft.siteId, workspaceId);
+      const prev = d.adDrafts.find((v) => v.articleId === draft.articleId);
+      const next: AdDraft = { ...draft, status: "draft", approvedAt: null, generations: (prev?.generations ?? 0) + 1, updatedAt: now() };
+      d.adDrafts = [...d.adDrafts.filter((v) => v.articleId !== draft.articleId), next];
+      return next;
+    });
+  },
+  async setAdStatus(workspaceId: string, articleId: string, status: AdDraft["status"]) {
+    await write((d) => {
+      const x = d.adDrafts.find((v) => v.articleId === articleId);
+      if (!x) throw new AccessDenied();
+      siteOf(d, x.siteId, workspaceId);
+      Object.assign(x, { status, approvedAt: status === "approved" ? now() : null, updatedAt: now() });
     });
   },
 

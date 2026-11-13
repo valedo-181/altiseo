@@ -169,6 +169,53 @@ Propose exactement ${count} questions différentes.${avoid.length ? `\nAucune ne
 }
 
 // ---------------------------------------------------------------------------
+// Publicités : annonces Google Ads et Meta Ads pour un article
+// ---------------------------------------------------------------------------
+
+const AdsSchema = z.object({
+  google: z.object({
+    headlines: z.array(z.string()).describe("12 titres différents, 30 caractères au plus chacun, espaces compris"),
+    descriptions: z.array(z.string()).describe("4 descriptions, 90 caractères au plus chacune"),
+    path1: z.string().describe("Un mot pour l'adresse affichée, 15 caractères au plus"),
+    path2: z.string().describe("Un second mot, 15 caractères au plus"),
+    keywords: z.array(z.string()).describe("10 à 15 recherches Google à cibler, en minuscules, 2 à 5 mots"),
+    negatives: z.array(z.string()).describe("5 à 10 mots à exclure (recherches sans intention d'achat)"),
+  }),
+  meta: z.object({
+    primaryTexts: z.array(z.string()).describe("3 textes principaux différents, 125 caractères au plus chacun"),
+    headline: z.string().describe("Titre sous l'image, 40 caractères au plus"),
+    description: z.string().describe("Ligne sous le titre, 30 caractères au plus"),
+    cta: z.enum(["LEARN_MORE", "CONTACT_US", "GET_QUOTE", "SIGN_UP", "BOOK_NOW"]).describe("Le bouton qui convient à la page"),
+  }),
+});
+
+export type AdsInput = { site: SiteBrief; title: string; keyword: string; summary: string };
+
+/**
+ * Annonces pour faire connaître un article : une annonce responsive Google (recherche) avec ses
+ * mots-clés, et une publicité Meta (Facebook, Instagram). Les longueurs sont revérifiées ensuite
+ * par cleanAds : ce qui dépasse est écarté.
+ */
+export async function writeAds(input: AdsInput, c = claude()): Promise<{ ads: z.infer<typeof AdsSchema>; usage: Usage }> {
+  const { out, usage } = await ask(c, AdsSchema, [
+    { type: "text", text: `Tu écris des publicités en ligne pour une PME, dans sa langue, pour amener des lecteurs vers un article de son blog. Les limites de caractères sont strictes et se comptent espaces compris : un texte trop long est jeté, donc vise court (titres Google : 20 à 30 caractères).
+
+Règles des régies, à respecter :
+- Titres Google : pas de point d'exclamation, pas de mots en MAJUSCULES, pas de ponctuation répétée, chaque titre doit avoir du sens seul (Google les combine au hasard).
+- Aucun superlatif invérifiable (« le meilleur », « n° 1 », « garanti »), aucun prix, délai, chiffre ou promesse que les informations fournies ne contiennent pas.
+- Meta : ne t'adresse pas au lecteur sur ses caractéristiques personnelles (santé, âge, origine, situation financière…), pas d'avant/après, pas de fausse urgence.
+- Varie les angles : le sujet de l'article, le bénéfice pour le lecteur, l'entreprise, un appel à l'action.
+
+${RULES}` },
+  ], `${briefText(input.site)}
+
+Article à promouvoir : ${input.title}
+Mot-clé principal : ${input.keyword}
+Résumé : ${input.summary}`, 6000);
+  return { ads: out, usage };
+}
+
+// ---------------------------------------------------------------------------
 // Article (F03)
 // ---------------------------------------------------------------------------
 

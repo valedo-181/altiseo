@@ -1,4 +1,4 @@
-import { BarChart3, Bot, FileBarChart, Globe, ListChecks, TrendingUp, CalendarDays, ShieldCheck, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
+import { Megaphone, BarChart3, Bot, FileBarChart, Globe, ListChecks, TrendingUp, CalendarDays, ShieldCheck, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
 
 /** Menu de l'application (partagé par le serveur et le navigateur). */
 export const NAV = [
@@ -6,6 +6,7 @@ export const NAV = [
   { href: "/app/statistiques", label: "Statistiques", Icon: BarChart3 },
   { href: "/app/calendrier", label: "Calendrier", Icon: CalendarDays },
   { href: "/app/articles", label: "Articles", Icon: FileText },
+  { href: "/app/publicites", label: "Publicités", Icon: Megaphone },
   { href: "/app/mots-cles", label: "Mots-clés", Icon: LineChart },
   { href: "/app/positions", label: "Positions Google", Icon: TrendingUp },
   { href: "/app/indexation", label: "Indexation", Icon: ListChecks },

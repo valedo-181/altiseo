@@ -14,6 +14,7 @@ export const READINESS = {
   sending: { label: "Envoi réel sur WordPress ou GitHub", ready: config.cms, needs: "ENCRYPTION_KEY" },
   images: { label: "Images des articles (Higgsfield)", ready: config.images, needs: "HIGGSFIELD_KEY_ID" },
   autopublish: { label: "Publication automatique", ready: has("CRON_SECRET"), needs: "CRON_SECRET" },
+  ads: { label: "Publicités : annonces Google et Meta prêtes à lancer", ready: config.ai, needs: "ANTHROPIC_API_KEY" },
   keywords: { label: "Mots-clés (Google Search Console)", ready: config.search, needs: "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et ENCRYPTION_KEY" },
   positions: { label: "Positions Google (DataForSEO)", ready: has("DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD"), needs: "DATAFORSEO_LOGIN et DATAFORSEO_PASSWORD" },
   // Les quatre IA annoncées doivent répondre : une seule clé manquante et la fonction n'est pas montrée.

@@ -2,7 +2,7 @@ import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
 import { supabaseUrl } from "@/lib/supabase/url";
-import type { SiteAnalytics, StatsDay, StatsKind, Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { AdDraft, SiteAnalytics, StatsDay, StatsKind, Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import type { DueTopic } from "@/lib/jobs/select";
 import type { TopRow } from "@/lib/stats/summary";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
@@ -750,7 +750,42 @@ export const supabaseDb = {
       await ad.storage.from("article-images").remove([`${workspaceId}/${a.imageUrl.slice(prefix.length)}`]).catch(() => undefined);
     }
   },
+
+  // Publicités (annonces préparées pour un article) --------------------------
+  // Lecture : client de la personne (RLS). Écriture : serveur, après vérification de l'article.
+  async listAdDrafts(workspaceId: string, siteId: string): Promise<AdDraft[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("ad_drafts").select("*").eq("site_id", siteId).order("updated_at", { ascending: false })) as Row[] | null) ?? []).map(toAdDraft);
+  },
+  async adDraftOf(workspaceId: string, articleId: string): Promise<AdDraft | null> {
+    const sb = await userClient();
+    const r = check(await sb.from("ad_drafts").select("*").eq("article_id", articleId).eq("workspace_id", workspaceId).maybeSingle()) as Row | null;
+    return r ? toAdDraft(r) : null;
+  },
+  /** Remplace les annonces de l'article ; elles repassent en « à valider ». */
+  async saveAdDraft(workspaceId: string, draft: Pick<AdDraft, "articleId" | "siteId" | "google" | "meta" | "landingUrl" | "demo">): Promise<AdDraft> {
+    const a = await this.getArticle(workspaceId, draft.articleId);
+    if (!a || a.siteId !== draft.siteId) throw new AccessDenied();
+    const ad = adminClient();
+    const prev = check(await ad.from("ad_drafts").select("generations").eq("article_id", draft.articleId).maybeSingle()) as Row | null;
+    const row = one(await ad.from("ad_drafts").upsert({
+      article_id: draft.articleId, workspace_id: workspaceId, site_id: draft.siteId, google: draft.google, meta: draft.meta,
+      landing_url: draft.landingUrl, demo: draft.demo, status: "draft", approved_at: null, generations: Number(prev?.generations ?? 0) + 1,
+    }, { onConflict: "article_id" }).select("*").single());
+    return toAdDraft(row);
+  },
+  async setAdStatus(workspaceId: string, articleId: string, status: AdDraft["status"]) {
+    if (!(await this.adDraftOf(workspaceId, articleId))) throw new AccessDenied();
+    check(await adminClient().from("ad_drafts").update({ status, approved_at: status === "approved" ? new Date().toISOString() : null }).eq("article_id", articleId).eq("workspace_id", workspaceId));
+  },
 };
+
+const toAdDraft = (r: Row): AdDraft => ({
+  articleId: s(r.article_id), siteId: s(r.site_id), google: r.google as AdDraft["google"], meta: r.meta as AdDraft["meta"], landingUrl: s(r.landing_url),
+  status: r.status === "approved" ? "approved" : "draft", demo: Boolean(r.demo), generations: Number(r.generations ?? 1), approvedAt: (r.approved_at as string) ?? null, updatedAt: s(r.updated_at),
+});
+
 
 
 

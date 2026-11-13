@@ -38,6 +38,7 @@ const ALL_ROWS: [string, string | boolean, string | boolean, string | boolean, F
   ["Calendrier de sujets à valider", true, true, true],
   ["Une photo réaliste créée pour chaque article", true, true, true, "images"],
   ["Publication automatique chaque matin (sujets approuvés)", true, true, true, "autopublish"],
+  ["Annonces Google Ads et Meta Ads prêtes à lancer pour chaque article", true, true, true, "ads"],
   ["Mots-clés : clics et positions depuis Google Search Console", true, true, true, "keywords"],
   ["Visibilité IA : questions suivies chaque semaine", "10", "30 par site", "30 par site", "aiVisibility"],
   ["IA interrogées", "ChatGPT, Perplexity", "ChatGPT, Gemini, Perplexity, Claude", "Les 4", "aiVisibility"],

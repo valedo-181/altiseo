@@ -178,3 +178,23 @@ migration `20261113000000_images_articles.sql`, stockage public Supabase `articl
   stockage sont acceptées (un membre peut modifier `image_url` dans la base : `isOwnImage`).
 - Sans `HIGGSFIELD_KEY_ID` / `HIGGSFIELD_KEY_SECRET` : image d'exemple, annoncée comme telle, jamais envoyée au site.
 - Pas encore : coût des images dans la console admin (tarif à confirmer), choix du style par client.
+
+## Publicités : annonces Google Ads et Meta Ads (préparer, puis valider)
+
+Pages `/app/publicites` (S32) et `/app/publicites/[article]` (S33). Code : `src/lib/ads/format.ts` (limites des
+régies, nettoyage, annonces d'exemple, export), `writeAds` dans `src/lib/ai/claude.ts`, `prepareAds` dans
+`src/lib/app/service.ts`, table `ad_drafts` (migration `20261120000000_publicites.sql`).
+
+- Pour un article : une annonce responsive Google (jusqu'à 15 titres de 30 caractères, 4 descriptions de 90,
+  mots-clés et exclusions) et une publicité Meta (3 textes de 125, titre de 40, description de 30, bouton).
+  Ce qui dépasse une limite est écarté, jamais coupé. Règles des régies appliquées dans le code : pas de point
+  d'exclamation ni de majuscules dans les titres Google, doublons retirés.
+- Rien n'est envoyé à Google ni à Meta. La personne relit, valide, puis copie les textes ou importe le fichier
+  Google Ads Editor (campagne créée en pause). L'adresse de destination porte un suivi `utm_`.
+- Cinq versions au plus par article. Sans clé Claude : annonces d'exemple, annoncées comme telles.
+- **Non vérifié** : les noms de colonnes du fichier Google Ads Editor suivent le format connu de l'outil mais
+  n'ont pas été essayés dans Editor ; à contrôler au premier import.
+- Étape suivante (pas faite) : déposer les annonces en pause directement dans les comptes par les API. Cela
+  demande, côté Google, un compte administrateur Google Ads et un jeton développeur validé (accès « Basic »),
+  et côté Meta, une application avec vérification de l'entreprise et revue de la permission `ads_management`.
+  Compter plusieurs semaines : à demander dès maintenant si l'on veut cette étape.

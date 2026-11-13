@@ -1,5 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { writeAds } from "@/lib/ai/claude";
+import { cleanAds, demoAds, MAX_AD_GENERATIONS } from "@/lib/ads/format";
 import { AiError, analyzeSite, planTopics, writeArticle, type SiteBrief } from "@/lib/ai/claude";
 import { testWordPress, uploadWordPressMedia, upsertWordPressPost } from "@/lib/cms/wordpress";
 import { isBranch, isDir, isRepo, looksLikeGitHubToken, publicArticleUrl, testGitHub, upsertGitHubArticle } from "@/lib/cms/github";
@@ -527,4 +529,46 @@ export async function googleAccess(workspaceId: string, siteId: string): Promise
   const access = await refreshAccess(google(), refresh);
   if (!access.ok) { await db.markSearchError(workspaceId, siteId, access.error); return fail(access.error); }
   return { ok: true, value: { access: access.value, property: conn.property } };
+}
+
+// ---------------------------------------------------------------------------
+// Publicités : annonces Google Ads et Meta Ads préparées pour un article
+// ---------------------------------------------------------------------------
+
+/**
+ * Prépare (ou refait) les annonces d'un article. Rien n'est envoyé à Google ni à Meta : la personne
+ * les relit, les valide, puis les copie ou les importe elle-même. Cinq préparations au plus par article.
+ */
+export async function prepareAds(workspaceId: string, articleId: string): Promise<Result<{ demo: boolean }>> {
+  const a = await db.getArticle(workspaceId, articleId);
+  if (!a) return fail("Article introuvable.");
+  const prev = await db.adDraftOf(workspaceId, a.id);
+  if (prev && prev.generations >= MAX_AD_GENERATIONS) return fail(`Les annonces de cet article ont déjà été refaites ${MAX_AD_GENERATIONS} fois.`);
+  const site = await db.getSite(workspaceId, a.siteId);
+  const keyword = a.keywords[0] ?? site.theme;
+  // La page de destination : l'article tel qu'il est (ou sera) en ligne sur le site du client.
+  const pub = await db.publicationOf(workspaceId, a.id);
+  const live = pub?.status === "ok" && pub.remoteUrl && a.status === "published" && !/wp-admin|\/edit/.test(pub.remoteUrl) && pub.remoteUrl.startsWith("https://") ? pub.remoteUrl : null;
+  const landingUrl = live ?? `${site.url}/${a.slug}/`;
+  let raw: Parameters<typeof cleanAds>[0];
+  if (config.ai) {
+    try {
+      raw = (await writeAds({ site: await brief(workspaceId, site), title: a.title, keyword, summary: a.metaDescription })).ads;
+    } catch (e) {
+      return fail(aiMessage(e));
+    }
+  } else {
+    raw = demoAds({ title: a.title, keyword, siteName: site.name, theme: site.theme });
+  }
+  const clean = cleanAds(raw);
+  if (!clean.ok) return fail(`Les annonces proposées ne respectaient pas les limites des régies. Réessayez. (${clean.error})`);
+  await db.saveAdDraft(workspaceId, { articleId: a.id, siteId: a.siteId, google: clean.ads.google, meta: clean.ads.meta, landingUrl, demo: !config.ai });
+  return { ok: true, value: { demo: !config.ai } };
+}
+
+export async function setAdsApproved(workspaceId: string, articleId: string, approved: boolean): Promise<Result> {
+  const d = await db.adDraftOf(workspaceId, articleId);
+  if (!d) return fail("Préparez d'abord les annonces de cet article.");
+  await db.setAdStatus(workspaceId, articleId, approved ? "approved" : "draft");
+  return { ok: true, value: undefined };
 }

@@ -568,3 +568,24 @@ export async function removeArticleImage(f: FormData) {
   await svc.removeArticleImage(workspace.id, id);
   revalidatePath(`/app/articles/${id}`);
 }
+
+// ---------------------------------------------------------------------------
+// Publicités
+// ---------------------------------------------------------------------------
+
+export async function prepareAds(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace } = await requireSite();
+  const id = str(f, "id");
+  const r = await svc.prepareAds(workspace.id, id);
+  revalidatePath("/app/publicites");
+  revalidatePath(`/app/publicites/${id}`);
+  return r.ok ? { ok: r.value.demo ? "Annonces d'exemple prêtes." : "Annonces prêtes : relisez-les avant de les valider." } : { error: r.error };
+}
+
+export async function approveAds(f: FormData) {
+  const { workspace } = await requireSite();
+  const id = str(f, "id");
+  await svc.setAdsApproved(workspace.id, id, f.get("approved") === "1");
+  revalidatePath("/app/publicites");
+  revalidatePath(`/app/publicites/${id}`);
+}

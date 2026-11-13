@@ -1,11 +1,12 @@
 import { isReady, type Feature } from "@/lib/readiness";
-import { BarChart3, Bot, FileBarChart, ImageIcon, LineChart, ListChecks, Send, ShieldCheck, TrendingUp } from "lucide-react";
+import { Megaphone, BarChart3, Bot, FileBarChart, ImageIcon, LineChart, ListChecks, Send, ShieldCheck, TrendingUp } from "lucide-react";
 
 /** Tout ce qu'Altiseo fait autour du blog. Une seule liste, reprise sur l'accueil et sur la page Services. */
 export const FEATURES = [
   { group: "Écrire et publier", items: [
     { Icon: ImageIcon, key: "images", title: "Une photo pour chaque article", text: "Une image réaliste créée pour le sujet, sans texte ni visage reconnaissable. Elle part avec l'article comme image mise en avant." },
     { Icon: Send, key: "autopublish", title: "Publication automatique", text: "Chaque matin, l'article du jour s'écrit et part sur votre site, en brouillon ou publié. Seuls les sujets que vous avez approuvés." },
+    { Icon: Megaphone, key: "ads", title: "Annonces Google et Meta", text: "Pour chaque article, une annonce Google Ads et une publicité Facebook et Instagram prêtes à lancer. Vous validez, rien n'est dépensé sans vous." },
   ] },
   { group: "Mesurer", items: [
     { Icon: LineChart, key: "keywords", title: "Mots-clés", text: "Vos clics, vos affichages et votre position dans Google, tirés de Search Console et suivis jour après jour." },

@@ -381,6 +381,27 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
     await page.getByText("Mesure des visites active.").waitFor();
   }
 
+  console.log("S32 publicités (annonces d'exemple)");
+  {
+    await page.goto(BASE + "/app/publicites");
+    await page.getByRole("heading", { name: "Publicités", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Préparer les annonces" }).first().click();
+    await page.getByRole("link", { name: "Voir les annonces" }).first().click();
+    await page.getByRole("heading", { name: "Google Ads" }).waitFor();
+    const counts = await page.locator("section[aria-labelledby=h-google] li span[aria-label*='caractères sur 30']").allInnerTexts();
+    assert(counts.length >= 3 && counts.every((c) => Number(c.split("/")[0]) <= 30), "titres Google dans la limite de 30 caractères");
+    assert(await page.getByText("À relire").count() >= 1, "annonces à relire avant tout");
+    await page.getByRole("button", { name: "Valider les annonces" }).click();
+    await page.getByText("Annonces validées").waitFor();
+    const csv = await page.request.get(page.url() + "/google.csv");
+    const body = await csv.text();
+    assert(csv.status() === 200 && body.includes('"Paused"') && body.includes("utm_source=google"), "export Google Ads Editor : campagne en pause, adresse suivie");
+    await shot("S33");
+    await page.getByRole("button", { name: "Refaire les annonces" }).click();
+    await page.getByText("À relire").first().waitFor();
+    assert(true, "refaire les annonces les remet en relecture");
+  }
+
   console.log("Sécurité : un autre compte ne voit rien");
   const other = await browser.newContext();
   const p2 = await other.newPage();
@@ -389,6 +410,8 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   await p2.getByRole("button", { name: "Créer mon compte" }).click();
   await p2.waitForURL("**/onboarding/site");
   const r404 = await p2.goto(articleUrl);
+  const adsOther = await p2.request.get(articleUrl.replace("/app/articles/", "/app/publicites/") + "/google.csv");
+  assert(adsOther.status() === 404 || adsOther.url().includes("/onboarding"), "les annonces d'Alice sont introuvables pour Bruno");
   assert(r404.status() === 404 || p2.url().includes("/onboarding"), "l'article d'Alice est introuvable pour Bruno");
   const anon = await (await browser.newContext()).newPage();
   await anon.goto(BASE + "/app");

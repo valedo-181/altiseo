@@ -216,3 +216,17 @@ export type SiteAnalytics = { siteId: string; siteKey: string; enabled: boolean;
 export type StatsDay = { day: string; visitors: number; pageviews: number };
 export type StatsKind = "page" | "source" | "device" | "country";
 export type StatsDim = { day: string; kind: StatsKind; value: string; visitors: number; pageviews: number };
+
+/** Annonces Google Ads et Meta Ads préparées pour un article (voir src/lib/ads/format.ts). */
+export type AdDraft = {
+  articleId: string;
+  siteId: string;
+  google: import("../ads/format.ts").GoogleAd;
+  meta: import("../ads/format.ts").MetaAd;
+  landingUrl: string; // la page de l'article sur le site du client
+  status: "draft" | "approved";
+  demo: boolean; // annonces d'exemple (sans IA)
+  generations: number;
+  approvedAt: string | null;
+  updatedAt: string;
+};

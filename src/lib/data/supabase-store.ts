@@ -2,8 +2,9 @@ import "server-only";
 import { encryptSecret, toBytea, fromBytea, decryptSecret } from "@/lib/crypto";
 import { adminClient, userClient } from "@/lib/supabase/server";
 import { supabaseUrl } from "@/lib/supabase/url";
-import type { Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { SiteAnalytics, StatsDay, StatsKind, Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiEngineName, AiPlan, AiQuestion, AiRun, Article, AuditIssue, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import type { DueTopic } from "@/lib/jobs/select";
+import type { TopRow } from "@/lib/stats/summary";
 import { AccessDenied, Conflict, QuotaReached } from "./errors";
 
 /**
@@ -674,6 +675,38 @@ export const supabaseDb = {
       fails: Number(r.fails ?? 0), sslCheckedAt: (r.ssl_checked_at as string) ?? null, domainCheckedAt: (r.domain_checked_at as string) ?? null,
       domainSource: (r.domain_source as SiteMonitor["domainSource"]) ?? null, emails: (r.emails as string[]) ?? [],
     }));
+  },
+
+  // Statistiques sans cookies ------------------------------------------------
+  async analyticsOf(workspaceId: string, siteId: string): Promise<SiteAnalytics> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    const r = (check(await sb.from("site_analytics").select("*").eq("site_id", siteId).maybeSingle()) as Row | null)
+      ?? one(await adminClient().from("site_analytics").upsert({ site_id: siteId, workspace_id: workspaceId }, { onConflict: "site_id" }).select("*").single());
+    return { siteId: s(r.site_id), siteKey: s(r.site_key), enabled: r.enabled !== false, lastHitAt: (r.last_hit_at as string) ?? null };
+  },
+  async saveAnalytics(workspaceId: string, siteId: string, patch: { enabled: boolean }) {
+    await siteOf(workspaceId, siteId);
+    check(await adminClient().from("site_analytics").update({ enabled: patch.enabled }).eq("site_id", siteId).eq("workspace_id", workspaceId));
+  },
+  /** Page vue reçue du script (serveur seulement). false : clé inconnue, mesure arrêtée, plafond du jour. */
+  async analyticsHit(h: { key: string; visitor: string; path: string; source: string; device: string; country: string }): Promise<boolean> {
+    return Boolean(check(await adminClient().rpc("analytics_hit", { p_key: h.key, p_visitor: h.visitor, p_path: h.path, p_source: h.source, p_device: h.device, p_country: h.country })));
+  },
+  async statsDays(workspaceId: string, siteId: string, since: string): Promise<StatsDay[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.from("analytics_days").select("day, visitors, pageviews").eq("site_id", siteId).gte("day", since).order("day").limit(800)) as Row[] | null) ?? [])
+      .map((r) => ({ day: s(r.day), visitors: Number(r.visitors), pageviews: Number(r.pageviews) }));
+  },
+  async statsTop(workspaceId: string, siteId: string, since: string, kind: StatsKind, limit = 8): Promise<TopRow[]> {
+    await siteOf(workspaceId, siteId);
+    const sb = await userClient();
+    return ((check(await sb.rpc("analytics_top", { p_site: siteId, p_since: since, p_kind: kind, p_limit: limit })) as Row[] | null) ?? [])
+      .map((r) => ({ value: s(r.value), count: Number(r.count), share: Number(r.total) ? Math.round((Number(r.count) / Number(r.total)) * 100) : 0 }));
+  },
+  async analyticsPurge() {
+    check(await adminClient().rpc("analytics_purge"));
   },
 
   // Publication automatique (tâche de fond, service_role) -------------------

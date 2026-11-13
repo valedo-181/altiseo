@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { db } from "@/lib/data/store";
 import { runDaily } from "@/lib/jobs/daily";
 import { runAsSystem } from "@/lib/supabase/server";
 
@@ -17,6 +18,8 @@ export async function GET(request: NextRequest) {
   const wanted = Buffer.from(`Bearer ${secret}`);
   if (given.length !== wanted.length || !timingSafeEqual(given, wanted)) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   try {
+    // Ménage des statistiques (empreintes du jour effacées après deux jours) : ne bloque pas la publication.
+    await runAsSystem(() => db.analyticsPurge()).catch((e) => console.error("cron.stats.menage", e instanceof Error ? e.message : e));
     const summary = await runAsSystem(() => runDaily());
     console.log("cron.daily", JSON.stringify({ ...summary, failed: summary.failed.length }));
     for (const f of summary.failed) console.error("cron.daily.echec", f.step, f.itemId, f.error);

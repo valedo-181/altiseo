@@ -2,11 +2,12 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
+import type { SiteAnalytics, StatsDay, StatsDim, StatsKind, Branding, ReportDue, SiteReport, IndexingDue, IndexNowSubmission, RankCheck, RankDue, RankKeyword, SiteIndexing, UrlInspection, MonitorDay, MonitorDue, MonitorIncident, SiteMonitor, AiCheck, AiDueSite, AiPlan, AiQuestion, AiRun, Article, AuditRun, CalendarItem, Competitor, Integration, Publication, SearchConnection, SearchReport, Site, Subscription, User, Workspace } from "@/lib/domain/types";
 import { AI_PLANS, weekOf } from "@/lib/geo/analyze";
 import { RANK_PLANS } from "@/lib/rank/serp";
 import { SITE_LIMITS } from "@/lib/domain/plan-limits";
-import { localDate } from "@/lib/domain/dates";
+import { addDays, localDate } from "@/lib/domain/dates";
+import { top, type TopRow } from "@/lib/stats/summary";
 
 /**
  * Couche de données en MODE DÉMO : un fichier JSON local (.data/demo.json), un seul processus.
@@ -43,9 +44,13 @@ type Doc = {
   inspections: UrlInspection[];
   branding: Array<Branding & { workspaceId: string }>;
   reports: SiteReport[];
+  analytics: Array<SiteAnalytics & { workspaceId: string }>;
+  statsDays: Array<StatsDay & { siteId: string }>;
+  statsDims: Array<StatsDim & { siteId: string }>;
+  statsSeen: Array<{ siteId: string; day: string; visitor: string }>;
 };
 
-const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [], branding: [], reports: [] };
+const EMPTY: Doc = { users: [], workspaces: [], memberships: [], subscriptions: [], sites: [], competitors: [], calendar: [], articles: [], integrations: [], publications: [], audits: [], search: [], aiQuestions: [], aiRuns: [], aiChecks: [], monitors: [], monitorDays: [], incidents: [], rankKeywords: [], rankChecks: [], indexing: [], submissions: [], inspections: [], branding: [], reports: [], analytics: [], statsDays: [], statsDims: [], statsSeen: [] };
 const FILE = process.env.ALTISEO_DEMO_FILE ?? path.join(process.cwd(), ".data", "demo.json");
 
 import type { DueTopic } from "@/lib/jobs/select";
@@ -658,6 +663,64 @@ export const demoDb = {
   },
   async indexingDue(): Promise<IndexingDue[]> {
     return read((d) => d.search.filter((c) => !c.demo).map((c) => ({ workspaceId: d.sites.find((s) => s.id === c.siteId)?.workspaceId ?? "", siteId: c.siteId })).filter((x) => x.workspaceId));
+  },
+
+  // -------------------------------------------------------------------------
+  // Statistiques sans cookies
+  // -------------------------------------------------------------------------
+
+  async analyticsOf(workspaceId: string, siteId: string): Promise<SiteAnalytics> {
+    const found = await read((d) => { siteOf(d, siteId, workspaceId); return d.analytics.find((a) => a.siteId === siteId) ?? null; });
+    const row = found ?? await write((d) => {
+      siteOf(d, siteId, workspaceId);
+      let a = d.analytics.find((x) => x.siteId === siteId);
+      if (!a) { a = { siteId, workspaceId, siteKey: randomUUID().replace(/-/g, ""), enabled: true, lastHitAt: null }; d.analytics.push(a); }
+      return a;
+    });
+    const { workspaceId: _w, ...a } = row;
+    return a;
+  },
+  async saveAnalytics(workspaceId: string, siteId: string, patch: { enabled: boolean }) {
+    await this.analyticsOf(workspaceId, siteId);
+    await write((d) => { const a = d.analytics.find((x) => x.siteId === siteId && x.workspaceId === workspaceId); if (a) a.enabled = patch.enabled; });
+  },
+  async analyticsHit(h: { key: string; visitor: string; path: string; source: string; device: string; country: string }): Promise<boolean> {
+    return write((d) => {
+      const a = d.analytics.find((x) => x.siteKey === h.key && x.enabled);
+      if (!a) return false;
+      const sub = d.subscriptions.find((x) => x.workspaceId === a.workspaceId);
+      if (!sub || !(sub.status === "active" || (sub.status === "trialing" && (!sub.trialEndsAt || sub.trialEndsAt > now())))) return false;
+      const day = localDate(new Date(), "Europe/Zurich");
+      let t = d.statsDays.find((x) => x.siteId === a.siteId && x.day === day);
+      if (t && t.pageviews >= 100_000) return false;
+      const fresh = !d.statsSeen.some((x) => x.siteId === a.siteId && x.day === day && x.visitor === h.visitor);
+      if (fresh) d.statsSeen.push({ siteId: a.siteId, day, visitor: h.visitor });
+      if (!t) { t = { siteId: a.siteId, day, visitors: 0, pageviews: 0 }; d.statsDays.push(t); }
+      t.pageviews++;
+      if (fresh) t.visitors++;
+      const bump = (kind: StatsKind, value: string, pv: number) => {
+        let r = d.statsDims.find((x) => x.siteId === a.siteId && x.day === day && x.kind === kind && x.value === value);
+        if (!r) { r = { siteId: a.siteId, day, kind, value, visitors: 0, pageviews: 0 }; d.statsDims.push(r); }
+        r.pageviews += pv;
+        if (fresh) r.visitors++;
+      };
+      bump("page", (h.path || "/").slice(0, 300), 1);
+      if (fresh) { bump("source", h.source || "Direct", 0); bump("device", h.device || "Ordinateur", 0); bump("country", h.country || "??", 0); }
+      a.lastHitAt = now();
+      return true;
+    });
+  },
+  async statsDays(workspaceId: string, siteId: string, since: string): Promise<StatsDay[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return d.statsDays.filter((x) => x.siteId === siteId && x.day >= since).sort((a, b) => a.day.localeCompare(b.day)).map(({ siteId: _s, ...x }) => x); });
+  },
+  async statsTop(workspaceId: string, siteId: string, since: string, kind: StatsKind, limit = 8): Promise<TopRow[]> {
+    return read((d) => { siteOf(d, siteId, workspaceId); return top(d.statsDims.filter((x) => x.siteId === siteId && x.day >= since), kind, limit); });
+  },
+  async analyticsPurge() {
+    await write((d) => {
+      const keep = addDays(localDate(new Date(), "Europe/Zurich"), -1);
+      d.statsSeen = d.statsSeen.filter((x) => x.day >= keep);
+    });
   },
 
   // -------------------------------------------------------------------------

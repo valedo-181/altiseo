@@ -1,4 +1,5 @@
 import "server-only";
+import { monthVisitors } from "./stats";
 import { siteOrigin } from "@/lib/config";
 import { db, QuotaReached } from "@/lib/data/store";
 import { localDate } from "@/lib/domain/dates";
@@ -69,6 +70,7 @@ export type MonthlyReport = {
   ai: { score: number | null; before: number | null; seen: number; total: number; engines: string[]; demo: boolean } | null;
   uptime: { pct: number | null; checks: number; incidents: number; downtimeMs: number };
   search: { clicks: number; impressions: number; prevClicks: number; prevImpressions: number; days: number; demo: boolean } | null;
+  visits: { visitors: number; pageviews: number; prevVisitors: number | null; prevPageviews: number | null } | null;
 };
 
 /** Le rapport d'un mois pour un site (à lire sous runAsSystem pour le lien du client). */
@@ -81,6 +83,8 @@ export async function monthlyReport(workspaceId: string, siteId: string, month: 
     db.monitorIncidents(workspaceId, siteId, 50), db.searchConnection(workspaceId, siteId), db.searchReport(workspaceId, siteId),
     db.aiPlan(workspaceId), db.rankPlan(workspaceId),
   ]);
+  const prevMonth = monthBounds(shiftMonth(month, -1));
+  const [visitsNow, visitsBefore] = await Promise.all([monthVisitors(workspaceId, siteId, from, to), monthVisitors(workspaceId, siteId, prevMonth.from, prevMonth.to)]);
   const host = new URL(site.url).hostname.replace(/^www\./, "");
 
   // Articles publiés dans le mois
@@ -135,6 +139,7 @@ export async function monthlyReport(workspaceId: string, siteId: string, month: 
     site: { name: site.name || host, url: site.url, host }, branding, articles: list, positions, ai,
     uptime: { pct: up.pct, checks: up.checks, incidents: monthIncidents.length, downtimeMs: totalDowntimeMs(monthIncidents, from, to) },
     search: searchPart,
+    visits: visitsNow ? { ...visitsNow, prevVisitors: visitsBefore?.visitors ?? null, prevPageviews: visitsBefore?.pageviews ?? null } : null,
   };
 }
 

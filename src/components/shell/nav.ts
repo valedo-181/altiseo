@@ -1,8 +1,9 @@
-import { Bot, FileBarChart, Globe, ListChecks, TrendingUp, CalendarDays, ShieldCheck, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
+import { BarChart3, Bot, FileBarChart, Globe, ListChecks, TrendingUp, CalendarDays, ShieldCheck, FileText, Gauge, LayoutDashboard, LineChart, Plug, Settings } from "lucide-react";
 
 /** Menu de l'application (partagé par le serveur et le navigateur). */
 export const NAV = [
   { href: "/app", label: "Tableau de bord", Icon: LayoutDashboard, exact: true },
+  { href: "/app/statistiques", label: "Statistiques", Icon: BarChart3 },
   { href: "/app/calendrier", label: "Calendrier", Icon: CalendarDays },
   { href: "/app/articles", label: "Articles", Icon: FileText },
   { href: "/app/mots-cles", label: "Mots-clés", Icon: LineChart },

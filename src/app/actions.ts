@@ -12,6 +12,7 @@ import * as geo from "@/lib/app/geo";
 import * as gardien from "@/lib/app/monitor";
 import * as positions from "@/lib/app/positions";
 import * as agence from "@/lib/app/report";
+import * as stats from "@/lib/app/stats";
 import { endSession, rememberSite, startSession } from "@/lib/app/session";
 import { db, Conflict } from "@/lib/data/store";
 import { INSTRUCTIONS_MAX, type Lang } from "@/lib/domain/types";
@@ -408,6 +409,25 @@ export async function saveMonitorSettings(_: FormState, f: FormData): Promise<Fo
   const r = await gardien.saveMonitorSettings(workspace.id, site.id, { enabled: f.get("enabled") === "on", emails: str(f, "emails"), domainExpiresOn: str(f, "domain") });
   revalidatePath("/app/gardien");
   return r.ok ? { ok: "Réglages du gardien enregistrés." } : { error: r.error };
+}
+
+// ---------------------------------------------------------------------------
+// Statistiques sans cookies
+// ---------------------------------------------------------------------------
+
+export async function saveStatsSettings(_: FormState, f: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const enabled = f.get("enabled") === "on";
+  await stats.saveStatsSettings(workspace.id, site.id, enabled);
+  revalidatePath("/app/statistiques");
+  return { ok: enabled ? "Mesure des visites active." : "Mesure des visites arrêtée : le script ne compte plus rien." };
+}
+
+export async function verifyStatsInstall(_s?: FormState, _f?: FormData): Promise<FormState> {
+  const { workspace, site } = await requireSite();
+  const r = await stats.verifyInstall(workspace.id, site.id);
+  revalidatePath("/app/statistiques");
+  return r.ok ? { ok: r.value } : { error: r.error };
 }
 
 // ---------------------------------------------------------------------------

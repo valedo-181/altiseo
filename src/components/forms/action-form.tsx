@@ -5,9 +5,10 @@ import type { FormState } from "@/app/actions";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Banner } from "@/components/ui/feedback";
 
-type Props = Omit<React.FormHTMLAttributes<HTMLFormElement>, "action" | "onSubmit"> & {
+type Props = Omit<React.FormHTMLAttributes<HTMLFormElement>, "action" | "onSubmit" | "children"> & {
   action: (s: FormState, f: FormData) => Promise<FormState>;
-  children: React.ReactNode;
+  /** Contenu du formulaire, ou une fonction de l'état renvoyé (pour un formulaire en plusieurs étapes). */
+  children: React.ReactNode | ((state: FormState) => React.ReactNode);
 };
 
 const Pending = createContext<{ pending: boolean; via: string | null } | null>(null);
@@ -34,7 +35,7 @@ export function ActionForm({ action, children, ...rest }: Props) {
           {state?.error && <div className="mb-4"><Banner tone="danger">{state.error}</Banner></div>}
           {state?.ok && <div className="mb-4"><Banner tone="success">{state.ok}</Banner></div>}
         </div>
-        {children}
+        {typeof children === "function" ? children(state) : children}
       </Pending.Provider>
     </form>
   );

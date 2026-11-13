@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { userClient } from "@/lib/supabase/server";
+import { finishLogin } from "@/lib/auth/finish-login";
 
 /**
  * Retour du lien de connexion (Supabase Auth, flux PKCE) : ouvre la session, crée l'espace au premier
@@ -14,9 +15,6 @@ export async function GET(request: NextRequest) {
   const sb = await userClient();
   const { data, error } = await sb.auth.exchangeCodeForSession(code);
   if (error || !data.user) return back("/connexion?erreur=lien");
-  const name = (data.user.user_metadata?.name as string | undefined) ?? null;
-  const { error: wsError } = await sb.rpc("ensure_workspace", { ws_name: name ? `Espace de ${name}` : null });
-  if (wsError) return back("/connexion?erreur=espace");
-  const { count } = await sb.from("sites").select("id", { count: "exact", head: true });
-  return back(count ? "/app" : "/onboarding/site");
+  const next = await finishLogin(sb, data.user);
+  return back(next ?? "/connexion?erreur=espace");
 }

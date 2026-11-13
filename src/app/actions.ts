@@ -5,6 +5,8 @@ import { headers } from "next/headers";
 import { requireAccount, requireSite, ONBOARDING_STEPS, type OnboardingSlug } from "@/lib/app/context";
 import { config, siteOrigin } from "@/lib/config";
 import { userClient } from "@/lib/supabase/server";
+import { finishLogin } from "@/lib/auth/finish-login";
+import { normalizeOtp } from "@/lib/auth/otp";
 import * as svc from "@/lib/app/service";
 import * as geo from "@/lib/app/geo";
 import * as gardien from "@/lib/app/monitor";
@@ -16,17 +18,18 @@ import { INSTRUCTIONS_MAX, type Lang } from "@/lib/domain/types";
 import { normalizeSiteUrl, siteNameFromHost } from "@/lib/domain/url";
 
 /** État renvoyé aux formulaires (useActionState). */
-export type FormState = { error?: string; ok?: string } | undefined;
+export type FormState = { error?: string; ok?: string; /** Connexion : adresse à qui le code vient d'être envoyé (étape 2). */ sentTo?: string } | undefined;
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 // ---------------------------------------------------------------------------
-// Compte (S03). Avec Supabase : lien de connexion par e-mail (sans mot de passe à retenir).
+// Compte (S03). Avec Supabase : un e-mail avec un lien de connexion ET un code à 6 chiffres
+// (sans mot de passe à retenir). Le code sert quand le lien s'ouvre sur un autre appareil ou navigateur.
 // En mode démo : l'e-mail suffit, sans confirmation.
 // ---------------------------------------------------------------------------
 
-/** Envoie le lien de connexion. Message identique que le compte existe ou non (pas d'énumération). */
+/** Envoie le lien et le code de connexion. Message identique que le compte existe ou non (pas d'énumération). */
 async function sendMagicLink(email: string, name: string | null, create: boolean): Promise<FormState> {
   const h = await headers();
   const origin = siteOrigin(h.get("origin") ?? undefined);
@@ -37,14 +40,33 @@ async function sendMagicLink(email: string, name: string | null, create: boolean
   if (error) console.error("auth.signInWithOtp", { status: error.status, code: (error as { code?: string }).code, message: error.message });
   if (error && error.status === 429) return { error: "Trop de demandes. Réessayez dans quelques minutes." };
   if (error && !/not allowed|signups not allowed|user not found/i.test(error.message)) return { error: "L'e-mail n'a pas pu être envoyé. Réessayez." };
-  return { ok: `Si l'adresse est correcte, un lien de connexion vient d'être envoyé à ${email}. Il est valable une heure.` };
+  return { ok: `Si l'adresse est correcte, un e-mail vient d'être envoyé à ${email}, avec un code à 6 chiffres et un lien. Ils sont valables une heure.`, sentTo: email };
 }
+
+/** Étape 2 : vérifie le code reçu par e-mail et ouvre la session. */
+async function verifyCode(email: string, rawCode: string): Promise<FormState> {
+  const keep = { sentTo: email };
+  const token = normalizeOtp(rawCode);
+  if (!token) return { ...keep, error: "Le code compte 6 chiffres. Recopiez-le depuis l'e-mail." };
+  const sb = await userClient();
+  const { data, error } = await sb.auth.verifyOtp({ email, token, type: "email" });
+  if (error) console.error("auth.verifyOtp", { status: error.status, code: (error as { code?: string }).code });
+  if (error && error.status === 429) return { ...keep, error: "Trop d'essais. Patientez quelques minutes, puis réessayez." };
+  if (error || !data.user) return { ...keep, error: "Ce code n'est pas bon ou n'est plus valable. Vérifiez-le, ou demandez un nouveau code." };
+  const next = await finishLogin(sb, data.user);
+  if (!next) return { ...keep, error: "Votre compte est ouvert, mais l'espace n'a pas pu être créé. Réessayez ; si cela continue, écrivez-nous." };
+  redirect(next);
+}
+
+/** Le formulaire est-il à l'étape du code (et pas « renvoyer un code ») ? */
+const codeStep = (f: FormData) => f.has("code") && str(f, "intent") !== "renvoyer";
 
 export async function signUp(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
   const name = str(f, "name") || null;
   if (!EMAIL.test(email)) return { error: "Cette adresse e-mail n'est pas valide." };
   if (name && name.length > 80) return { error: "Le nom est trop long." };
+  if (config.supabase && codeStep(f)) return verifyCode(email, str(f, "code"));
   if (config.supabase) return sendMagicLink(email, name, true);
   try {
     const { user } = await db.createAccount(email, name);
@@ -59,6 +81,7 @@ export async function signUp(_: FormState, f: FormData): Promise<FormState> {
 export async function signIn(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
   if (!EMAIL.test(email)) return { error: "Cette adresse e-mail n'est pas valide." };
+  if (config.supabase && codeStep(f)) return verifyCode(email, str(f, "code"));
   if (config.supabase) return sendMagicLink(email, null, false);
   const user = await db.findUserByEmail(email);
   if (!user) return { error: "Aucun compte avec cet e-mail. Créez-en un." };

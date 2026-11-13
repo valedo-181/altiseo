@@ -22,6 +22,8 @@ export type Client = {
   plan: string | null; status: Status; trialDaysLeft: number | null; suspendedReason: string | null;
   /** Revenu mensuel (CHF) : 0 pendant l'essai. */
   revenueChf: number;
+  /** Prix mensuel de son offre (CHF), qu'il paie déjà ou non. */
+  priceChf: number;
   /** Coût IA des 30 derniers jours (CHF). */
   aiCost30Chf: number;
   marginChf: number;
@@ -75,7 +77,7 @@ export function toClient(r: WorkspaceRow, now: Date, usdChf = DEFAULT_USD_CHF): 
   return {
     id: r.id, name: r.name, email: r.owner_email, siteUrl: r.site_url, sites: r.sites, createdAt: r.created_at,
     plan: r.plan_code, status, trialDaysLeft, suspendedReason: r.suspended_reason,
-    revenueChf, aiCost30Chf, marginChf, marginPct: revenueChf > 0 ? Math.round((marginChf / revenueChf) * 100) : null,
+    revenueChf, priceChf: (r.price_month_cents ?? 0) / 100, aiCost30Chf, marginChf, marginPct: revenueChf > 0 ? Math.round((marginChf / revenueChf) * 100) : null,
     articlesPeriod: r.articles_period, quota: r.articles_per_month ?? 0, articles30d: r.articles_30d, articlesTotal: r.articles_total,
     costPerArticleChf: r.articles_total ? ((r.ai_cost_total_micro / 1_000_000) * usdChf) / r.articles_total : null,
     lastSignIn: r.owner_last_sign_in, lastArticleAt: r.last_article_at, failed: r.failed_items,
@@ -132,6 +134,8 @@ export const STATUS_LABEL: Record<Status, string> = {
 export const ACTION_LABEL: Record<string, string> = {
   suspend: "Suspension", unsuspend: "Réactivation", extend_trial: "Essai prolongé", set_plan: "Offre changée",
   retry_job: "Tâche relancée", retry_topic: "Sujet relancé",
+  create_workspace: "Client créé", delete_workspace: "Client supprimé", set_note: "Note interne modifiée",
+  add_admin: "Administrateur ajouté", remove_admin: "Administrateur retiré",
 };
 
 /** Résumé lisible d'une ligne du journal. */
@@ -140,5 +144,81 @@ export function describe(action: string, data: Record<string, unknown> | null): 
   if (action === "suspend") return `Raison : ${String(d.reason ?? "—")}`;
   if (action === "extend_trial") return `+${String(d.days)} jours, jusqu'au ${d.until ? new Date(String(d.until)).toLocaleDateString("fr-CH") : "—"}`;
   if (action === "set_plan") return `${String(d.from)} → ${String(d.to)}`;
+  if (action === "create_workspace") return `${String(d.name ?? "")} · ${String(d.email ?? "")} · offre ${String(d.plan ?? "")}, essai de ${String(d.trial_days ?? "?")} jours`;
+  if (action === "delete_workspace") return `${String(d.name ?? "")} · ${String(d.sites ?? 0)} site(s), ${String(d.articles ?? 0)} article(s) effacés`;
+  if (action === "add_admin" || action === "remove_admin") return String(d.email ?? "");
   return "";
 }
+
+// ---------------------------------------------------------------------------
+// Revenus
+// ---------------------------------------------------------------------------
+
+export type Revenue = {
+  mrr: number; arr: number;
+  /** Ce que rapporteraient en plus les essais en cours s'ils s'abonnaient tous. */
+  trialPotential: number;
+  byPlan: Array<{ plan: string; paying: number; trials: number; mrr: number }>;
+  /** Essais qui se terminent dans les 7 jours, le plus proche d'abord. */
+  endingSoon: Client[];
+  /** Essais terminés sans abonnement : à relancer. */
+  lapsed: Client[];
+  /** Inscriptions par semaine (lundi), de la plus ancienne à la plus récente. */
+  signups: Array<{ week: string; count: number }>;
+  /** Part des essais terminés qui paient aujourd'hui ; null tant qu'aucun essai n'est terminé. */
+  conversionPct: number | null;
+};
+
+const PLAN_ORDER = ["grow", "scale", "agence"];
+
+/** Lundi (UTC) de la semaine d'une date, au format AAAA-MM-JJ. */
+export function weekOf(d: Date): string {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7));
+  return t.toISOString().slice(0, 10);
+}
+
+export function revenue(list: Client[], now: Date, weeks = 8): Revenue {
+  const live = list.filter((c) => c.status !== "suspended");
+  const paying = live.filter((c) => c.status === "active" || c.status === "past_due");
+  const trials = live.filter((c) => c.status === "trial");
+  const mrr = paying.reduce((n, c) => n + c.revenueChf, 0);
+  const plans = [...new Set([...PLAN_ORDER, ...live.map((c) => c.plan ?? "")].filter(Boolean))];
+  const byPlan = plans.map((plan) => ({
+    plan,
+    paying: paying.filter((c) => c.plan === plan).length,
+    trials: trials.filter((c) => c.plan === plan).length,
+    mrr: paying.filter((c) => c.plan === plan).reduce((n, c) => n + c.revenueChf, 0),
+  })).filter((p) => p.paying || p.trials || PLAN_ORDER.includes(p.plan));
+  const first = weekOf(new Date(now.getTime() - (weeks - 1) * 7 * DAY));
+  const signups: Revenue["signups"] = [];
+  for (let i = 0; i < weeks; i++) signups.push({ week: weekOf(new Date(new Date(`${first}T00:00:00Z`).getTime() + i * 7 * DAY)), count: 0 });
+  for (const c of list) { const row = signups.find((x) => x.week === weekOf(new Date(c.createdAt))); if (row) row.count++; }
+  const lapsed = live.filter((c) => c.status === "trial_ended");
+  const decided = paying.length + lapsed.length + live.filter((c) => c.status === "canceled").length;
+  return {
+    mrr, arr: mrr * 12,
+    trialPotential: trials.reduce((n, c) => n + c.priceChf, 0),
+    byPlan,
+    endingSoon: trials.filter((c) => c.trialDaysLeft !== null && c.trialDaysLeft <= 7).sort((a, b) => (a.trialDaysLeft ?? 0) - (b.trialDaysLeft ?? 0)),
+    lapsed,
+    signups,
+    conversionPct: decided ? Math.round((paying.length / decided) * 100) : null,
+  };
+}
+
+export const PLAN_LABEL: Record<string, string> = { grow: "Grow", scale: "Scale", agence: "Agence" };
+
+// ---------------------------------------------------------------------------
+// Fiche d'un client et administrateurs (lignes renvoyées par la base)
+// ---------------------------------------------------------------------------
+
+export type ClientDetail = {
+  members: Array<{ email: string | null; role: string; last_sign_in: string | null; joined: string }>;
+  sites: Array<{ id: string; name: string; url: string; configured: boolean; language: string; publish_mode: string; integration: string | null; integration_simulated: boolean; articles: number; published: number; topics_approved: number }>;
+  usage: { images: number; ads: number; ads_approved: number; rank_keywords: number; ai_questions: number; search_connected: boolean };
+  note: string | null; note_at: string | null;
+};
+export type AdminRow = { user_id: string; email: string | null; added_at: string; added_by_email: string | null; last_sign_in: string | null; mfa_ready: boolean; is_me: boolean };
+
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;

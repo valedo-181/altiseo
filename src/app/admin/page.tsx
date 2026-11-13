@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { buttonClass } from "@/components/ui/button";
 import { Card, KpiCard } from "@/components/ui/card";
 import { Banner, EmptyState } from "@/components/ui/feedback";
 import { chf, FILTERS, matches, totals, type FilterKey } from "@/lib/admin/console";
@@ -10,10 +11,10 @@ import { MfaScreen } from "./mfa";
 import { day, HealthDot, StatusBadge } from "./ui";
 
 /** Tableau de bord et liste des clients. */
-export default async function AdminHome({ searchParams }: { searchParams: Promise<{ f?: string; q?: string }> }) {
+export default async function AdminHome({ searchParams }: { searchParams: Promise<{ f?: string; q?: string; supprime?: string }> }) {
   const ctx = await adminContext();
   if (ctx.mfa !== "ok") return <MfaScreen ctx={ctx} />;
-  const { f = "all", q = "" } = await searchParams;
+  const { f = "all", q = "", supprime } = await searchParams;
   const filter = (FILTERS.some(([k]) => k === f) ? f : "all") as FilterKey;
   const { clients, failed } = await loadClients(ctx, new Date());
   const t = totals(clients);
@@ -22,7 +23,8 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Clients" lead={`${t.clients} espace${t.clients > 1 ? "s" : ""} · ${t.articles30} articles écrits en 30 jours`} />
+      <PageHeader title="Clients" lead={`${t.clients} espace${t.clients > 1 ? "s" : ""} · ${t.articles30} articles écrits en 30 jours`} actions={<Link href="/admin/clients/nouveau" className={buttonClass("primary")}>Nouveau client</Link>} />
+      {supprime && <Banner tone="success">Le client et toutes ses données ont été supprimés.</Banner>}
       {failed && <Banner tone="danger">Les clients n'ont pas pu être chargés.</Banner>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Revenu mensuel" value={chf(t.mrr)} hint={`${t.paying} client${t.paying > 1 ? "s" : ""} payant${t.paying > 1 ? "s" : ""}`} />

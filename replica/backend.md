@@ -198,3 +198,27 @@ régies, nettoyage, annonces d'exemple, export), `writeAds` dans `src/lib/ai/cla
   demande, côté Google, un compte administrateur Google Ads et un jeton développeur validé (accès « Basic »),
   et côté Meta, une application avec vérification de l'entreprise et revue de la permission `ads_management`.
   Compter plusieurs semaines : à demander dès maintenant si l'on veut cette étape.
+
+
+## Console super admin, suite (créer et supprimer un client, revenus, fiche, administrateurs)
+
+Migration `20261121000000_admin_plus.sql`, test `replica/tests/admin_plus_test.sql` (8 vérifications).
+Comme le reste de la console : tout passe par des fonctions `admin_*` qui exigent un compte listé et la double
+authentification, et qui écrivent au journal.
+
+- **Nouveau client** (`/admin/clients/nouveau`) : le serveur crée le compte avec l'API d'administration de
+  Supabase (après avoir revérifié le droit), puis `admin_create_workspace` crée l'espace, le responsable et
+  l'essai (1 à 90 jours). Aucun e-mail n'est envoyé : la personne se connecte avec son adresse.
+- **Supprimer** : `admin_delete_workspace` exige le nom retapé à l'identique et refuse l'espace d'un
+  administrateur. Tout part en cascade ; le serveur efface ensuite les images du stockage et les comptes
+  qui n'appartiennent plus à aucun espace. La suppression reste au journal (nom, nombre de sites et d'articles).
+- **Revenus** (`/admin/revenus`) : revenu mensuel et annuel, par offre, potentiel des essais, essais qui se
+  terminent sous 7 jours, essais terminés sans abonnement, inscriptions par semaine. Calculé d'après l'offre :
+  aucun paiement réel tant que Stripe n'est pas branché.
+- **Fiche d'un client** : sites (configuration, connexion, articles), usage (images, annonces, positions,
+  visibilité IA, Search Console), personnes, note interne (`platform_notes`, illisible par les clients ; son
+  texte ne va pas au journal).
+- **Administrateurs** (`/admin/admins`) : ajout par adresse (le compte doit exister), retrait (jamais le
+  sien, donc toujours au moins un), dix au plus. Chacun configure sa propre double authentification.
+- Non vérifié dans un navigateur : la console n'existe pas en mode démo (elle exige la vraie base). Vérifié :
+  la base (test ci-dessus), les calculs (tests unitaires), la compilation.

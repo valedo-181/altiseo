@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "@/lib/cx";
 
-const NAV = [["/admin", "Clients"], ["/admin/couts", "Coûts IA"], ["/admin/technique", "Suivi technique"], ["/admin/journal", "Journal"]] as const;
+const NAV = [["/admin", "Clients"], ["/admin/revenus", "Revenus"], ["/admin/couts", "Coûts IA"], ["/admin/technique", "Suivi technique"], ["/admin/journal", "Journal"], ["/admin/admins", "Administrateurs"]] as const;
 
 export function AdminNav() {
   const path = usePathname();

@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound, redirect } from "next/navigation";
 import { config } from "@/lib/config";
 import { userClient } from "@/lib/supabase/server";
-import { DEFAULT_USD_CHF, toClient, type Client, type WorkspaceRow } from "./console";
+import { DEFAULT_USD_CHF, toClient, type AdminRow, type Client, type ClientDetail, type WorkspaceRow } from "./console";
 
 /**
  * Accès à la console super admin : compte listé dans platform_admins, puis double authentification.
@@ -50,4 +50,15 @@ export type JournalRow = { at: string; admin_email: string | null; workspace_id:
 export async function loadJournal(ctx: AdminContext, workspaceId: string | null, limit: number): Promise<JournalRow[]> {
   const { data } = await ctx.supabase.rpc("admin_journal", { wid: workspaceId, lim: limit });
   return (data ?? []) as JournalRow[];
+}
+
+/** null : la base n'a pas encore reçu la mise à jour de la console (migration admin_plus). */
+export async function loadDetail(ctx: AdminContext, workspaceId: string): Promise<ClientDetail | null> {
+  const { data, error } = await ctx.supabase.rpc("admin_workspace_detail", { wid: workspaceId });
+  return error || !data ? null : (data as ClientDetail);
+}
+
+export async function loadAdmins(ctx: AdminContext): Promise<AdminRow[] | null> {
+  const { data, error } = await ctx.supabase.rpc("admin_list_admins");
+  return error ? null : ((data ?? []) as AdminRow[]);
 }

@@ -1,5 +1,5 @@
 "use client";
-import { extendTrial, setPlan, suspendWorkspace, unsuspendWorkspace } from "@/app/admin/actions";
+import { deleteClient, extendTrial, setNote, setPlan, suspendWorkspace, unsuspendWorkspace } from "@/app/admin/actions";
 import { ActionForm, Submit } from "@/components/forms/action-form";
 import { TextField } from "@/components/ui/field";
 
@@ -54,6 +54,29 @@ export function SuspendForm({ id, suspended }: { id: string; suspended: boolean 
       <input type="hidden" name="id" value={id} />
       <TextField label="Raison de la suspension" name="reason" maxLength={300} required help="Le client la verra à sa prochaine connexion. Ses données sont gardées." />
       <Submit variant="danger">Suspendre le client</Submit>
+    </ActionForm>
+  );
+}
+
+export function NoteForm({ id, note }: { id: string; note: string }) {
+  return (
+    <ActionForm action={setNote} className="space-y-3">
+      <input type="hidden" name="id" value={id} />
+      <label htmlFor="note" className="block text-sm font-semibold">Ce qu'il faut savoir sur ce client</label>
+      <textarea id="note" name="note" defaultValue={note} rows={4} maxLength={4000} className="field w-full" aria-describedby="note-help" />
+      <p id="note-help" className="text-xs text-text-muted">Visible des administrateurs seulement. Le client ne la voit jamais. Laissez vide pour l'effacer.</p>
+      <Submit variant="secondary">Enregistrer la note</Submit>
+    </ActionForm>
+  );
+}
+
+export function DeleteForm({ id, name }: { id: string; name: string }) {
+  return (
+    <ActionForm action={deleteClient} className="space-y-3">
+      <input type="hidden" name="id" value={id} />
+      <p className="text-sm">Cette action efface <strong className="font-semibold">définitivement</strong> l'espace, ses sites, ses articles, ses images et ses réglages. Les articles déjà publiés sur le site du client y restent. Elle ne peut pas être annulée. Pour couper l'accès sans rien effacer, utilisez plutôt « Suspendre ».</p>
+      <TextField label={`Pour confirmer, retapez le nom du client : ${name}`} name="confirm" autoComplete="off" required />
+      <Submit variant="danger">Supprimer définitivement</Submit>
     </ActionForm>
   );
 }

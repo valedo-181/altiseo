@@ -12,8 +12,9 @@ import { ScoreGauge } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status";
 
 export const metadata: Metadata = { alternates: { canonical: "/" },
-  title: "Altiseo : votre blog SEO, écrit et publié pour vous",
-  description: "Altiseo prépare vos sujets, écrit un article par jour dans votre ton et l'envoie sur votre site. Vous relisez, vous publiez. Essai gratuit de 3 jours.",
+  // Ce texte accompagne aussi les liens partagés : il doit donner envie de cliquer, sans rien promettre d'invérifiable.
+  title: { absolute: "Altiseo : soyez trouvé sur Google et dans les IA" },
+  description: "Référencement naturel, annonces Google et Meta, visibilité dans ChatGPT : Altiseo écrit, publie et mesure pour vous. Essayez 3 jours gratuitement, sans carte bancaire.",
 };
 
 const BENEFITS = [

@@ -87,10 +87,17 @@
 
 ## À faire
 
-- [x] **Activer la publication automatique.** `CRON_SECRET` en place ; passage lancé à la main le 11.11.2026 :
-      secret accepté, `due: 0` (aucun sujet dû). Premier article automatique attendu le 14.11.2026 : à vérifier.
+- [x] **Activer la publication automatique.** `CRON_SECRET` en place ; passage lancé à la main le 11.11.2026.
+      Premier article automatique vérifié le 14.11.2026 : écrit à 04:01 UTC, avec son image, envoyé sur le site.
 - [ ] **Migrer la tâche vers « Schedules » de Vercel.** Les Cron Jobs de `vercel.json` sont marqués « Legacy »
       dans Vercel (ils fonctionnent encore). Lire la documentation de migration de Vercel avant de changer.
+- [ ] **Brancher DataForSEO (positions Google réelles).** En attente. Sans lui, la page Positions Google montre
+      des mesures d'exemple et la fonction est masquée sur le site public. Compte sur app.dataforseo.com, solde
+      rechargé (à l'usage, environ USD 0.002 à 0.004 par mot-clé et par semaine), puis `DATAFORSEO_LOGIN` et
+      `DATAFORSEO_PASSWORD` dans Vercel et redéploiement. Vérifier ensuite une première mesure réelle.
+- [ ] **Appliquer la migration `20261121000000_admin_plus.sql` en production.** Pas encore faite le 14.11.2026
+      (la demande de confirmation de Supabase est restée sans réponse). Tant qu'elle manque, les nouvelles
+      pages de la console admin affichent « mise à jour de la base à appliquer ».
 - [ ] **Brancher le vrai Google (Search Console).** En attente. Fait : domevia.ch est dans Search Console (12.11.2026).
       Reste, côté Google Cloud : projet, activer « Google Search Console API », écran de consentement OAuth (externe,
       adresse du propriétaire en utilisateur test), ID client « Application Web » avec les deux redirections

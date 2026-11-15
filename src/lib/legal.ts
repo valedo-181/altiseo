@@ -14,7 +14,7 @@ export const COMPANY = {
   /** Numéro d'identification des entreprises (ex. « CHE-123.456.789 »). Facultatif pour une personne non inscrite. */
   ide: "",
   /** Adresse de contact affichée, aussi pour les demandes liées aux données personnelles. */
-  email: "",
+  email: "info@altiseo.ch",
   /** Lieu du for juridique (en général le siège, ex. « Lausanne »). */
   forum: "",
 } as const;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
+import { legalReady } from "@/lib/legal";
 
 type Props = { title: string; lead: React.ReactNode; children: React.ReactNode; footer: React.ReactNode; aside: { quote: string; points: string[] } };
 
@@ -22,7 +23,7 @@ export function AuthShell({ title, lead, children, footer, aside }: Props) {
           </div>
           <div className="mt-6 text-sm text-text-muted">{footer}</div>
         </div>
-        <p className="relative text-xs text-text-muted">© 2026 Altiseo, Suisse · <Link href="/tarifs" className="hover:text-text">Tarifs</Link> · <Link href="/services" className="hover:text-text">Services</Link></p>
+        <p className="relative text-xs text-text-muted">© 2026 Altiseo, Suisse · <Link href="/tarifs" className="hover:text-text">Tarifs</Link> · <Link href="/services" className="hover:text-text">Services</Link>{legalReady && <> · <Link href="/confidentialite" className="hover:text-text">Confidentialité</Link> · <Link href="/conditions" className="hover:text-text">Conditions</Link></>}</p>
       </main>
 
       <aside className="relative hidden overflow-hidden lg:block" aria-label="Altiseo en bref">

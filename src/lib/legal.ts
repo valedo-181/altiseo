@@ -4,19 +4,20 @@
  * Tant qu'un champ obligatoire est vide, les trois pages restent introuvables et leurs liens masqués :
  * on ne publie pas de pages légales à trous.
  */
+/** Source : extrait du registre du commerce du canton de Neuchâtel du 15 novembre 2026 (réf. 02632/2021). */
 export const COMPANY = {
   /** Raison sociale exacte, forme juridique comprise (ex. « Exemple Sàrl »). */
-  name: "",
+  name: "MetaPlexus Sàrl",
   /** Rue et numéro. */
-  street: "",
+  street: "rue des Saars 115",
   /** Code postal et localité (ex. « 1000 Lausanne »). */
-  city: "",
+  city: "2000 Neuchâtel",
   /** Numéro d'identification des entreprises (ex. « CHE-123.456.789 »). Facultatif pour une personne non inscrite. */
-  ide: "",
+  ide: "CHE-153.649.731",
   /** Adresse de contact affichée, aussi pour les demandes liées aux données personnelles. */
   email: "info@altiseo.ch",
   /** Lieu du for juridique (en général le siège, ex. « Lausanne »). */
-  forum: "",
+  forum: "Neuchâtel",
 } as const;
 
 export const LEGAL_UPDATED = "15 novembre 2026";

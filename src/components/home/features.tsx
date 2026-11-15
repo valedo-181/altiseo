@@ -28,9 +28,25 @@ export function readyFeatures() {
 
 /** Grille des fonctions prêtes, par famille. Une famille sans fonction prête n'apparaît pas. */
 export function FeatureGroups() {
+  const groups = readyFeatures();
+  const all = groups.flatMap((g) => g.items);
+  // Peu de fonctions branchées : une seule grille, sans titres de famille (une carte seule sous un titre fait vide).
+  if (all.length <= 4) {
+    return (
+      <ul className={`mt-12 grid gap-5 sm:grid-cols-2 ${all.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+        {all.map(({ Icon, title, text }) => (
+          <li key={title} className="min-w-0 rounded-xl border border-border bg-surface p-6">
+            <Icon aria-hidden="true" className="size-6 text-accent" />
+            <p className="mt-4 text-lg font-semibold text-text">{title}</p>
+            <p className="mt-2 text-text-muted">{text}</p>
+          </li>
+        ))}
+      </ul>
+    );
+  }
   return (
     <div className="mt-12 space-y-12">
-      {readyFeatures().map((g) => (
+      {groups.map((g) => (
         <div key={g.group}>
           <h3 className="font-display text-sm font-medium uppercase tracking-[0.14em] text-highlight">{g.group}</h3>
           <ul className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

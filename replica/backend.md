@@ -98,9 +98,8 @@
       des mesures d'exemple et la fonction est masquée sur le site public. Compte sur app.dataforseo.com, solde
       rechargé (à l'usage, environ USD 0.002 à 0.004 par mot-clé et par semaine), puis `DATAFORSEO_LOGIN` et
       `DATAFORSEO_PASSWORD` dans Vercel et redéploiement. Vérifier ensuite une première mesure réelle.
-- [ ] **Appliquer la migration `20261121000000_admin_plus.sql` en production.** Pas encore faite le 14.11.2026
-      (la demande de confirmation de Supabase est restée sans réponse). Tant qu'elle manque, les nouvelles
-      pages de la console admin affichent « mise à jour de la base à appliquer ».
+- [x] **Migration `20261121000000_admin_plus.sql` appliquée en production** le 16.11.2026 (en deux temps :
+      tables, puis fonctions). Les nouvelles pages de la console admin sont actives.
 - [ ] **Brancher le vrai Google (Search Console).** En attente. Fait : domevia.ch est dans Search Console (12.11.2026).
       Reste, côté Google Cloud : projet, activer « Google Search Console API », écran de consentement OAuth (externe,
       adresse du propriétaire en utilisateur test), ID client « Application Web » avec les deux redirections

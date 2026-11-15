@@ -48,6 +48,11 @@ function Word({ text }: { text: string }) {
 export default function Home() {
   // Le titre de la section des fonctions suit ce qui est réellement branché (src/lib/readiness.ts).
   const measures = readyFeatures().some((g) => g.group === "Mesurer");
+  // L'accroche reprend le message des liens partagés, mais n'annonce que ce qui est branché sur ce serveur.
+  const ads = isReady("ads"), ai = isReady("aiVisibility");
+  const pillars = ["Référencement naturel", ...(ads ? ["Annonces Google et Meta"] : []), ...(ai ? ["Visibilité dans ChatGPT"] : [])];
+  const does = ["écrit et publie vos articles", ...(ads ? ["prépare vos annonces Google et Meta"] : []), ...(ai ? ["suit ce que les IA disent de vous"] : [])];
+  const promise = `Altiseo ${does.length > 1 ? `${does.slice(0, -1).join(", ")} et ${does.at(-1)}` : does[0]}. Des contenus clairs et utiles, ceux que Google et les assistants IA reprennent. Vous gardez la main sur tout.`;
   return (
     <div data-theme="dark" className="bg-bg text-text">
       <RevealScope>
@@ -59,14 +64,19 @@ export default function Home() {
           <div className="relative"><PublicHeader /></div>
           <div className="scene is-in relative mx-auto flex w-full max-w-content flex-1 items-center px-4 pb-24 pt-10 md:px-8">
             <div className="max-w-2xl">
-              <p className="text-sm font-semibold text-accent">Blog SEO pour les PME suisses</p>
-              <h1 className="mt-4 text-[38px] leading-[1.05] md:text-[64px]">Votre site monte, article après article.</h1>
-              <p className="mt-6 max-w-xl text-lg !font-normal leading-relaxed text-text-muted md:text-xl">Altiseo prépare vos sujets, écrit vos articles et les envoie sur votre site. Vous gardez la main sur chaque texte.</p>
+              <p className="text-sm font-semibold text-accent">Référencement et publicité pour les PME suisses</p>
+              <h1 className="mt-4 text-[38px] leading-[1.05] md:text-[64px]">Soyez trouvé sur Google <span className="text-accent">et dans les IA.</span></h1>
+              <p className="mt-6 max-w-xl text-lg !font-normal leading-relaxed text-text-muted md:text-xl">{promise}</p>
+              <ul aria-label="Ce qu'Altiseo fait pour vous" className="mt-6 flex flex-wrap gap-2">
+                {pillars.map((t, i) => (
+                  <li key={t} className="flex items-center gap-2 rounded-pill border border-accent/50 bg-bg/70 px-3.5 py-1.5 text-sm font-semibold"><span aria-hidden="true" className="font-display text-xs font-medium text-highlight">{i + 1}</span>{t}</li>
+                ))}
+              </ul>
               <div className="mt-9 flex flex-wrap gap-3">
                 <Link href="/inscription" className={buttonClass("primary", "lg")}>Essayer 3 jours gratuitement</Link>
                 <Link href="/services" className={buttonClass("secondary", "lg")}>Voir comment ça marche</Link>
               </div>
-              <p className="mt-4 text-sm text-text-muted">Sans carte bancaire. Trente sujets proposés dès aujourd'hui.</p>
+              <p className="mt-4 text-sm text-text-muted">Sans carte bancaire. Trente sujets d'articles proposés dès aujourd'hui.</p>
             </div>
           </div>
         </section>
@@ -74,7 +84,7 @@ export default function Home() {
         {/* Bénéfices */}
         <section aria-labelledby="h-benefits" className="scene mx-auto max-w-content px-4 py-24 md:px-8">
           <div>
-            <h2 id="h-benefits" className="max-w-2xl font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]"><Word text="Un blog qui avance, même quand vous n'avez pas le temps" /></h2>
+            <h2 id="h-benefits" className="max-w-2xl font-display text-2xl font-medium leading-tight tracking-tight md:text-[40px] md:leading-[1.12]"><Word text="Votre site monte, article après article" /></h2>
             <ul className="mt-12 grid gap-5 md:grid-cols-3">
               {BENEFITS.map(({ Icon, title, text }) => (
                 <li key={title} className="rounded-xl border border-border bg-surface p-6">

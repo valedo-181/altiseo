@@ -48,6 +48,7 @@ Lucide (ISC).
 ```bash
 npm run build
 ALTISEO_DEMO=1 ALTISEO_SESSION_SECRET=un-secret-local-de-32-caracteres-au-moins ALTISEO_DEMO_FILE=/tmp/altiseo-demo.json npx next start -p 3100 &
+# (ALTISEO_DEMO_FILE passé aussi au script : il y ajoute un historique pour vérifier les courbes de positions)
 node scripts/slice-check.cjs       # 35 contrôles dans un vrai navigateur (Playwright)
 ```
 

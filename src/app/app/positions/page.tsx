@@ -13,10 +13,14 @@ import { addDays } from "@/lib/domain/dates";
 import type { RankCheck } from "@/lib/domain/types";
 import { hostOf } from "@/lib/geo/analyze";
 import { DEPTH, locationOf, movement, summarize } from "@/lib/rank/serp";
+import { keywordSeries, rankTrend, seriesSummary, sparkPath } from "@/lib/rank/history";
 import { AddKeyword, ImportKeywords, RunPositions } from "./buttons";
+import { PositionCharts } from "./charts";
 
 export const metadata: Metadata = { title: "Positions Google" };
 export const maxDuration = 60;
+/** Historique affiché dans les courbes. */
+const HISTORY_WEEKS = 12;
 
 const dayFmt = new Intl.DateTimeFormat("fr-CH", { day: "numeric", month: "long", timeZone: "UTC" });
 const COUNTRY: Record<string, string> = { CH: "Suisse", FR: "France", DE: "Allemagne", IT: "Italie", AT: "Autriche", BE: "Belgique", LU: "Luxembourg" };
@@ -43,11 +47,24 @@ function Move({ now, before }: { now: RankCheck | undefined; before: RankCheck |
   return <span className="text-text-muted">—</span>;
 }
 
+/** Mini-courbe d'un mot-clé sur les semaines mesurées (place 1 en haut). Le détail est dans le graphique au-dessus. */
+function Spark({ points }: { points: Array<{ day: string; value: number | null }> }) {
+  const { best, gain, ranked } = seriesSummary(points);
+  if (!ranked) return <span className="text-xs text-text-muted">—</span>;
+  const label = `Meilleure place ${best}${gain ? `, ${gain > 0 ? "monté" : "descendu"} de ${Math.abs(gain)}` : ""}`;
+  return (
+    <svg width={72} height={24} viewBox="0 0 72 24" role="img" aria-label={label} className="block">
+      <title>{label}</title>
+      <path d={sparkPath(points, 72, 24, DEPTH)} fill="none" stroke="rgb(var(--c-chart))" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Positions Google : la place du site pour chaque mot-clé suivi, chaque semaine. */
 export default async function Positions() {
   const { workspace, site } = await requireSite();
   const host = hostOf(site.url) ?? site.url;
-  const [max, keywords, weeks] = await Promise.all([db.rankPlan(workspace.id), db.listRankKeywords(workspace.id, site.id), db.rankWeeks(workspace.id, site.id, 2)]);
+  const [max, keywords, weeks] = await Promise.all([db.rankPlan(workspace.id), db.listRankKeywords(workspace.id, site.id), db.rankWeeks(workspace.id, site.id, HISTORY_WEEKS)]);
   const country = COUNTRY[locationOf(host).country] ?? "Suisse";
 
   if (!max) {
@@ -57,7 +74,8 @@ export default async function Positions() {
   const week = thisWeek();
   const tracked = keywords.slice(0, max);
   const [shown, prev] = [weeks[0] ?? null, weeks[1] ?? null];
-  const checks = await db.listRankChecks(workspace.id, site.id, [shown, prev].filter(Boolean) as string[]);
+  // Une lecture par semaine : chaque réponse reste sous la limite de lignes de la base, même avec 200 mots-clés.
+  const checks = (await Promise.all(weeks.map((w) => db.listRankChecks(workspace.id, site.id, [w])))).flat();
   const cur = new Map(checks.filter((c) => c.week === shown).map((c) => [c.keywordId, c]));
   const old = new Map(checks.filter((c) => c.week === prev).map((c) => [c.keywordId, c]));
   const live = positionsLive();
@@ -69,6 +87,8 @@ export default async function Positions() {
   const okBefore = tracked.map((k) => old.get(k.id)).filter((c): c is RankCheck => Boolean(c && c.status === "ok"));
   const before = summarize(okBefore.map((c) => c.position));
   const nextMonday = dayFmt.format(new Date(`${addDays(week, 7)}T12:00:00Z`));
+  const trend = rankTrend(weeks, checks, new Set(tracked.map((k) => k.id)));
+  const series = new Map(tracked.map((k) => [k.id, keywordSeries(weeks, checks, k.id)]));
   const sorted = [...tracked].sort((a, b) => (cur.get(a.id)?.position ?? 999) - (cur.get(b.id)?.position ?? 999) || a.phrase.localeCompare(b.phrase));
 
   return (
@@ -95,18 +115,25 @@ export default async function Positions() {
             <KpiCard label={`Absents des ${DEPTH} premiers`} value={`${okNow.length - sum.top50}`} hint="Une page dédiée les aide souvent" tone={okNow.length - sum.top50 > 0 ? "danger" : "muted"} />
           </div>
 
+          {weeks.length < 2 ? (
+            <Card className="text-sm text-text-muted">Les courbes d'évolution apparaîtront ici dès la deuxième semaine de mesure : il faut au moins deux points pour tracer une courbe.</Card>
+          ) : (
+            <PositionCharts depth={DEPTH} trend={trend} keywords={sorted.map((k) => ({ id: k.id, phrase: k.phrase, series: series.get(k.id) ?? [], ...seriesSummary(series.get(k.id) ?? []) }))} />
+          )}
+
           <section aria-labelledby="h-ranks" className="space-y-3">
             <div>
               <h2 id="h-ranks" className="text-lg">Vos positions</h2>
               <p className="text-sm text-text-muted">La flèche compare avec la semaine d'avant. « Après {DEPTH} » : le site n'est pas dans les {DEPTH} premiers résultats. Les annonces payantes ne sont pas comptées.</p>
             </div>
             <div className="card overflow-x-auto p-0">
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="border-b border-border text-xs text-text-muted">
                   <tr>
                     <th scope="col" className="px-4 py-2 font-semibold">Mot-clé</th>
                     <th scope="col" className="px-3 py-2 text-center font-semibold">Position</th>
                     <th scope="col" className="px-3 py-2 text-center font-semibold">Évolution</th>
+                    {weeks.length >= 2 && <th scope="col" className="px-3 py-2 font-semibold">{weeks.length} semaines</th>}
                     <th scope="col" className="px-3 py-2 font-semibold">Page trouvée</th>
                     <th scope="col" className="px-3 py-2 font-semibold">Les 3 premiers</th>
                   </tr>
@@ -119,6 +146,7 @@ export default async function Positions() {
                         <th scope="row" className="max-w-[260px] px-4 py-2.5 font-medium">{k.phrase}</th>
                         <td className="px-3 py-2.5 text-center"><Place c={c} /></td>
                         <td className="px-3 py-2.5 text-center"><Move now={c} before={old.get(k.id)} /></td>
+                        {weeks.length >= 2 && <td className="px-3 py-2.5"><Spark points={series.get(k.id) ?? []} /></td>}
                         <td className="max-w-[200px] truncate px-3 py-2.5 text-text-muted">{c?.url ? <a href={c.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{pathOf(c.url)}</a> : "—"}</td>
                         <td className="max-w-[240px] px-3 py-2.5 text-xs text-text-muted">{c?.top.length ? c.top.map((t) => <span key={t.rank} className="block truncate">{t.rank}. {t.domain === host ? <strong className="text-text">{t.domain}</strong> : t.domain}</span>) : "—"}</td>
                       </tr>

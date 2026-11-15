@@ -82,3 +82,34 @@ test("inspection d'URL : réponse de Google lue, champs inconnus ignorés", () =
   assert.equal(readInspection({ inspectionResult: { indexStatusResult: { verdict: "BIZARRE", lastCrawlTime: "pas une date" } } }).verdict, null);
   assert.equal(readInspection(null).coverage, null);
 });
+
+test("évolution : tendance par semaine, courbe d'un mot-clé avec ses trous, mini-courbe", async () => {
+  const { rankTrend, keywordSeries, seriesSummary, sparkPath } = await import("./history.ts");
+  const mk = (keywordId: string, week: string, position: number | null, status: "ok" | "error" = "ok") =>
+    ({ id: `${keywordId}-${week}`, siteId: "s", keywordId, week, status, position, url: null, top: [], error: null, demo: false, checkedAt: week });
+  const weeks = ["2026-11-16", "2026-11-02", "2026-11-09"]; // dans le désordre
+  const checks = [
+    mk("a", "2026-11-02", 24), mk("a", "2026-11-09", 12), mk("a", "2026-11-16", 7),
+    mk("b", "2026-11-02", null), mk("b", "2026-11-09", 48), mk("b", "2026-11-16", 3),
+    mk("c", "2026-11-09", 2, "error"), mk("c", "2026-11-16", 9),
+    mk("retiré", "2026-11-16", 1),
+  ];
+  const trend = rankTrend(weeks, checks, new Set(["a", "b", "c"]));
+  assert.deepEqual(trend.map((t) => t.week), ["2026-11-02", "2026-11-09", "2026-11-16"]);
+  assert.deepEqual(trend[0], { week: "2026-11-02", measured: 2, top3: 0, top10: 0, average: 24 });
+  assert.deepEqual(trend[1], { week: "2026-11-09", measured: 2, top3: 0, top10: 0, average: 30 }, "la mesure en erreur ne compte pas");
+  assert.deepEqual(trend[2], { week: "2026-11-16", measured: 3, top3: 1, top10: 3, average: 6.3 }, "un mot-clé retiré ne compte pas");
+
+  const b = keywordSeries(weeks, checks, "b");
+  assert.deepEqual(b, [{ day: "2026-11-02", value: null }, { day: "2026-11-09", value: 48 }, { day: "2026-11-16", value: 3 }]);
+  assert.deepEqual(seriesSummary(b), { best: 3, gain: 45, ranked: 2 });
+  assert.deepEqual(keywordSeries(weeks, checks, "c").map((p) => p.value), [null, null, 9], "erreur et semaine manquante : pas de point");
+  assert.deepEqual(seriesSummary([{ day: "x", value: null }]), { best: null, gain: null, ranked: 0 });
+
+  assert.equal(sparkPath([], 60, 20), "");
+  const d = sparkPath(keywordSeries(weeks, checks, "a"), 60, 20);
+  assert.match(d, /^M2,[\d.]+L30,[\d.]+L58,[\d.]+$/);
+  const ys = d.match(/,([\d.]+)/g)!.map((v) => Number(v.slice(1)));
+  assert.ok(ys[0] > ys[1] && ys[1] > ys[2], "une meilleure place est plus haut dans la mini-courbe");
+  assert.match(sparkPath(keywordSeries(weeks, checks, "c"), 60, 20), /^M57,[\d.]+L59,[\d.]+$/, "un point isolé reste visible");
+});

@@ -234,6 +234,33 @@ const assert = (c, m) => { if (!c) throw new Error("ÉCHEC : " + m); console.log
   await page.getByText("Positions d'exemple :").waitFor();
   assert(await page.getByRole("button", { name: "Mesurer les positions maintenant" }).count() === 0, "une mesure par semaine");
   await shot("S27");
+  assert(await page.getByText("Les courbes d'évolution apparaîtront ici dès la deuxième semaine").count() === 1, "une seule semaine : pas encore de courbe");
+  // Courbes d'évolution : on ajoute sept semaines d'historique dans le fichier de démonstration (s'il est indiqué).
+  if (process.env.ALTISEO_DEMO_FILE) {
+    const fs = require("fs");
+    const doc = JSON.parse(fs.readFileSync(process.env.ALTISEO_DEMO_FILE, "utf8"));
+    const now = doc.rankChecks.filter((c) => c.status === "ok");
+    for (let w = 1; w <= 7; w++) {
+      for (const [i, c] of now.entries()) {
+        const d = new Date(c.week + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 7 * w);
+        const worse = c.position == null ? null : c.position + w * (2 + (i % 3));
+        doc.rankChecks.push({ ...c, id: `${c.id}-h${w}`, week: d.toISOString().slice(0, 10), position: worse != null && worse <= 50 ? worse : null });
+      }
+    }
+    fs.writeFileSync(process.env.ALTISEO_DEMO_FILE, JSON.stringify(doc));
+    await page.waitForTimeout(1100); // le serveur relit le fichier quand sa date change
+    await page.reload();
+    await page.getByRole("heading", { name: "Évolution", exact: true }).waitFor();
+    assert(await page.locator("section[aria-labelledby=h-trend] figure svg path[stroke]").count() === 3, "trois courbes : top 10, position moyenne, mot-clé choisi");
+    assert(await page.locator("section[aria-labelledby=h-ranks] tbody svg").count() >= 1, "mini-courbe sur chaque ligne classée");
+    const options = await page.locator("#kw option").allInnerTexts();
+    await page.locator("#kw").selectOption({ label: options[options.length > 1 ? 1 : 0] });
+    assert(await page.locator("section[aria-labelledby=h-trend] figcaption").last().innerText().then((t) => t.includes(options[options.length > 1 ? 1 : 0])), "le graphique suit le mot-clé choisi");
+    const chart = page.locator("section[aria-labelledby=h-trend] figure [role=group]").nth(1);
+    await chart.hover({ position: { x: 220, y: 80 } });
+    assert(await chart.locator("[role=status]").innerText().then((t) => /Position/.test(t)), "survol : position de la semaine");
+    await shot("S27-evolution");
+  }
 
   console.log("S28 indexation (Search Console d'exemple + IndexNow)");
   await page.goto(BASE + "/app/indexation");

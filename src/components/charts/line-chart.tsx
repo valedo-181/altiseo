@@ -9,6 +9,8 @@ type Props = {
   invert?: boolean;
   unit: (n: number) => string;
   note?: string;
+  /** Où retrouver les mêmes chiffres en tableau (dit aux lecteurs d'écran). */
+  tableHint?: string;
 };
 
 const H = 190, PAD = { top: 12, right: 12, bottom: 26, left: 40 };
@@ -29,7 +31,7 @@ function niceMax(max: number): { top: number; step: number } {
  * Courbe d'une seule mesure dans le temps. Le pointeur (ou les flèches du clavier) choisit un jour :
  * un trait vertical, un point et une bulle donnent la valeur. Les jours sans donnée coupent la courbe.
  */
-export function LineChart({ title, points, invert, unit, note }: Props) {
+export function LineChart({ title, points, invert, unit, note, tableHint = "Les mêmes chiffres sont dans le tableau « Chiffres jour par jour »." }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(480);
   const [at, setAt] = useState<number | null>(null);
@@ -100,7 +102,7 @@ export function LineChart({ title, points, invert, unit, note }: Props) {
         onBlur={() => setAt(null)}
         onKeyDown={onKey}
       >
-        <p id={`${id}-d`} className="sr-only">Graphique. Utilisez les flèches gauche et droite pour lire la valeur de chaque jour. Les mêmes chiffres sont dans le tableau « Chiffres jour par jour ».</p>
+        <p id={`${id}-d`} className="sr-only">Graphique. Utilisez les flèches gauche et droite pour lire chaque valeur. {tableHint}</p>
         <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} aria-hidden="true" className="block max-w-full">
           {g.ticks.map((t) => (
             <g key={t}>

@@ -91,6 +91,10 @@
       Premier article automatique vérifié le 14.11.2026 : écrit à 04:01 UTC, avec son image, envoyé sur le site.
 - [ ] **Migrer la tâche vers « Schedules » de Vercel.** Les Cron Jobs de `vercel.json` sont marqués « Legacy »
       dans Vercel (ils fonctionnent encore). Lire la documentation de migration de Vercel avant de changer.
+- [ ] **Renseigner l'entreprise dans `src/lib/legal.ts` pour publier les pages légales.** Les pages
+      `/mentions-legales`, `/confidentialite` et `/conditions` sont écrites, mais restent introuvables (et leurs
+      liens masqués) tant que la raison sociale, l'adresse, l'e-mail de contact et le for sont vides. À faire
+      relire par un juriste avant l'ouverture au public. Tenir à jour la liste des prestataires (`PROCESSORS`).
 - [ ] **Brancher DataForSEO (positions Google réelles).** En attente. Sans lui, la page Positions Google montre
       des mesures d'exemple et la fonction est masquée sur le site public. Compte sur app.dataforseo.com, solde
       rechargé (à l'usage, environ USD 0.002 à 0.004 par mot-clé et par semaine), puis `DATAFORSEO_LOGIN` et

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
+import { LEGAL_PAGES, legalReady } from "@/lib/legal";
 
 /** Pied de page des pages publiques. */
 export function SiteFooter() {
@@ -11,6 +12,7 @@ export function SiteFooter() {
           <Link href="/services" className="hover:text-text">Services</Link>
           <Link href="/tarifs" className="hover:text-text">Tarifs</Link>
           <Link href="/connexion" className="hover:text-text">Connexion</Link>
+          {legalReady && LEGAL_PAGES.map(([href, label]) => <Link key={href} href={href} className="hover:text-text">{label}</Link>)}
         </nav>
         <p className="ml-auto text-sm text-text-muted">© 2026 Altiseo, Suisse</p>
       </div>

@@ -109,12 +109,10 @@
       `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY` (`openssl rand -base64 32`, à ne plus changer ensuite ; elle active
       aussi l'envoi réel à WordPress), puis redéployer. Ensuite : « Connecter mon compte Google » (première connexion
       réelle jamais testée), et validation de Google avant d'ouvrir au public (page de confidentialité requise).
-- [ ] **Finir le passage au domaine www.altiseo.ch.** Le domaine répond (vérifié par un aperçu de partage le
-      14.11.2026). Reste côté propriétaire : `NEXT_PUBLIC_SITE_URL=https://www.altiseo.ch` dans Vercel, puis dans
-      Supabase → Authentication → URL Configuration : *Site URL* `https://www.altiseo.ch` et *Redirect URLs*
-      `https://www.altiseo.ch/**` (garder l'ancienne adresse dans la liste pendant la transition). Sans cela les
-      liens de connexion par e-mail renvoient vers l'ancienne adresse. Ensuite : tester une connexion sur le
-      nouveau domaine, puis rediriger `altiseo-hazel.vercel.app` vers lui dans Vercel → Domains.
+- [ ] **Finir le passage au domaine www.altiseo.ch.** Le domaine répond. Le 16.11.2026, le propriétaire a réglé
+      `NEXT_PUBLIC_SITE_URL` dans Vercel et, dans Supabase, *Site URL* et *Redirect URLs* sur le nouveau domaine.
+      Reste : tester une connexion par e-mail sur www.altiseo.ch (le lien reçu doit commencer par cette adresse),
+      puis, après quelques jours, rediriger `altiseo-hazel.vercel.app` vers lui dans Vercel → Domains.
 - [x] **Brancher Higgsfield (images des articles).** Première image réelle créée et rangée le 12.11.2026.
 - [ ] **Resend (e-mails).** En attente du choix de l'adresse d'expédition : `titanor.app` (déjà vérifié,
       provisoire), `domevia.ch` ou un domaine Altiseo (3 lignes DNS à poser). Ensuite :

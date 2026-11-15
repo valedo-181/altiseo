@@ -104,16 +104,17 @@
 - [ ] **Brancher le vrai Google (Search Console).** En attente. Fait : domevia.ch est dans Search Console (12.11.2026).
       Reste, côté Google Cloud : projet, activer « Google Search Console API », écran de consentement OAuth (externe,
       adresse du propriétaire en utilisateur test), ID client « Application Web » avec les deux redirections
-      `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback` et
+      `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback` (transition) et
       `https://www.altiseo.ch/app/mots-cles/google/callback`. Côté Vercel : `GOOGLE_CLIENT_ID`,
       `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY` (`openssl rand -base64 32`, à ne plus changer ensuite ; elle active
       aussi l'envoi réel à WordPress), puis redéployer. Ensuite : « Connecter mon compte Google » (première connexion
       réelle jamais testée), et validation de Google avant d'ouvrir au public (page de confidentialité requise).
-- [ ] **Finir le passage au domaine www.altiseo.ch.** Domaine déclaré dans Vercel (www principal, le domaine seul
-      redirige). DNS chez Infomaniak : `A @ 216.150.1.1` et `CNAME www` vers la valeur donnée par Vercel, après avoir
-      retiré les entrées A / AAAA / CNAME par défaut. Une fois « Valid Configuration » : `NEXT_PUBLIC_SITE_URL` dans
-      Vercel, adresse du site et adresses de retour dans Supabase (sinon les liens de connexion échouent sur le
-      nouveau domaine), redirection Google, domaine d'expédition Resend.
+- [ ] **Finir le passage au domaine www.altiseo.ch.** Le domaine répond (vérifié par un aperçu de partage le
+      14.11.2026). Reste côté propriétaire : `NEXT_PUBLIC_SITE_URL=https://www.altiseo.ch` dans Vercel, puis dans
+      Supabase → Authentication → URL Configuration : *Site URL* `https://www.altiseo.ch` et *Redirect URLs*
+      `https://www.altiseo.ch/**` (garder l'ancienne adresse dans la liste pendant la transition). Sans cela les
+      liens de connexion par e-mail renvoient vers l'ancienne adresse. Ensuite : tester une connexion sur le
+      nouveau domaine, puis rediriger `altiseo-hazel.vercel.app` vers lui dans Vercel → Domains.
 - [x] **Brancher Higgsfield (images des articles).** Première image réelle créée et rangée le 12.11.2026.
 - [ ] **Resend (e-mails).** En attente du choix de l'adresse d'expédition : `titanor.app` (déjà vérifié,
       provisoire), `domevia.ch` ou un domaine Altiseo (3 lignes DNS à poser). Ensuite :
@@ -123,7 +124,7 @@
       2. `RESEND_API_KEY` et `MAIL_FROM` dans Vercel, puis les e-mails de l'app : article prêt à relire,
          échec d'envoi au site, fin d'essai.
 - [ ] Clé Claude (`ANTHROPIC_API_KEY`) et `ENCRYPTION_KEY` dans Vercel.
-- [ ] Domaine définitif à la place de `altiseo-hazel.vercel.app`.
+- [x] Domaine définitif : `www.altiseo.ch` (le domaine seul redirige), en service depuis le 14.11.2026.
 - [ ] Essayer la console `/admin` sur le vrai site (QR code de double authentification).
 
 

@@ -22,9 +22,11 @@ export const demoMode = !config.supabase;
 export const cronMode: "daily" | "hourly" = process.env.CRON_MODE === "hourly" ? "hourly" : "daily";
 
 /**
- * Adresse publique de l'application (liens de connexion par e-mail). On prend d'abord l'adresse sur
- * laquelle la personne se trouve (toujours juste), puis NEXT_PUBLIC_SITE_URL si elle manque.
+ * Adresse publique de l'application. On prend d'abord l'adresse sur laquelle la personne se trouve
+ * (toujours juste), puis NEXT_PUBLIC_SITE_URL. Si elle manque en production, c'est le domaine officiel :
+ * un lien envoyé à un client (rapport, alerte, code de statistiques) ne doit jamais pointer vers localhost.
  */
 export function siteOrigin(current?: string): string {
-  return (current || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").trim().replace(/\/+$/, "");
+  const fallback = process.env.NODE_ENV === "production" && !process.env.ALTISEO_DEMO ? "https://www.altiseo.ch" : "http://localhost:3000";
+  return (current || process.env.NEXT_PUBLIC_SITE_URL || fallback).trim().replace(/\/+$/, "");
 }

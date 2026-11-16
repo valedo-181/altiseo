@@ -109,7 +109,7 @@
       aussi l'envoi réel à WordPress), puis redéployer. Ensuite : « Connecter mon compte Google » (première connexion
       réelle jamais testée), et validation de Google avant d'ouvrir au public (page de confidentialité requise).
 - [ ] **Finir le passage au domaine www.altiseo.ch.** Le domaine répond. Le 16.11.2026, le propriétaire a réglé
-      `NEXT_PUBLIC_SITE_URL` dans Vercel et, dans Supabase, *Site URL* et *Redirect URLs* sur le nouveau domaine.
+      `NEXT_PUBLIC_SITE_URL` dans Vercel et, dans Supabase, *Site URL* et *Redirect URLs* sur le nouveau domaine. Le 16.11, la variable Vercel valait encore l'ancienne adresse : corrigée en `https://www.altiseo.ch` puis site reconstruit ; reste à vérifier /sitemap.xml en ligne.
       Reste : tester une connexion par e-mail sur www.altiseo.ch (le lien reçu doit commencer par cette adresse),
       puis, après quelques jours, rediriger `altiseo-hazel.vercel.app` vers lui dans Vercel → Domains.
 - [x] **Brancher Higgsfield (images des articles).** Première image réelle créée et rangée le 12.11.2026.

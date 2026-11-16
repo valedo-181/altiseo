@@ -94,7 +94,7 @@
 - [x] **Pages légales publiées** (15.11.2026) : `/mentions-legales`, `/confidentialite`, `/conditions`, au nom de
       MetaPlexus Sàrl (extrait du registre du commerce de Neuchâtel). Restent à faire : relecture par un juriste,
       et tenir à jour la liste des prestataires (`PROCESSORS` dans `src/lib/legal.ts`) à chaque service branché.
-- [ ] **Brancher DataForSEO (positions Google réelles).** Clés ajoutées dans Vercel le 15.11 ; reste à vérifier une première mesure réelle. Sans lui, la page Positions Google montre
+- [x] **Brancher DataForSEO (positions Google réelles).** Fait : première mesure réelle le 16.11 à 06:00 UTC (9 mots-clés mesurés, 2 sans réponse de DataForSEO). Sans lui, la page Positions Google montre
       des mesures d'exemple et la fonction est masquée sur le site public. Compte sur app.dataforseo.com, solde
       rechargé (à l'usage, environ USD 0.002 à 0.004 par mot-clé et par semaine), puis `DATAFORSEO_LOGIN` et
       `DATAFORSEO_PASSWORD` dans Vercel et redéploiement. Vérifier ensuite une première mesure réelle.

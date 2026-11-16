@@ -73,9 +73,16 @@ export default async function Positions() {
 
   const week = thisWeek();
   const tracked = keywords.slice(0, max);
-  const [shown, prev] = [weeks[0] ?? null, weeks[1] ?? null];
+  const allWeeks = weeks;
+  const shown = allWeeks[0] ?? null;
   // Une lecture par semaine : chaque réponse reste sous la limite de lignes de la base, même avec 200 mots-clés.
-  const checks = (await Promise.all(weeks.map((w) => db.listRankChecks(workspace.id, site.id, [w])))).flat();
+  const allChecks = (await Promise.all(allWeeks.map((w) => db.listRankChecks(workspace.id, site.id, [w])))).flat();
+  // Une fois les vraies mesures arrivées, les semaines d'exemple sortent des comparaisons et des courbes :
+  // on ne compare pas une place réelle à une place inventée.
+  const realNow = !allChecks.some((c) => c.week === shown && c.demo);
+  const checks = realNow ? allChecks.filter((c) => !c.demo) : allChecks;
+  const history = allWeeks.filter((w) => checks.some((c) => c.week === w));
+  const prev = history[1] ?? null;
   const cur = new Map(checks.filter((c) => c.week === shown).map((c) => [c.keywordId, c]));
   const old = new Map(checks.filter((c) => c.week === prev).map((c) => [c.keywordId, c]));
   const live = positionsLive();
@@ -87,8 +94,8 @@ export default async function Positions() {
   const okBefore = tracked.map((k) => old.get(k.id)).filter((c): c is RankCheck => Boolean(c && c.status === "ok"));
   const before = summarize(okBefore.map((c) => c.position));
   const nextMonday = dayFmt.format(new Date(`${addDays(week, 7)}T12:00:00Z`));
-  const trend = rankTrend(weeks, checks, new Set(tracked.map((k) => k.id)));
-  const series = new Map(tracked.map((k) => [k.id, keywordSeries(weeks, checks, k.id)]));
+  const trend = rankTrend(history, checks, new Set(tracked.map((k) => k.id)));
+  const series = new Map(tracked.map((k) => [k.id, keywordSeries(history, checks, k.id)]));
   const sorted = [...tracked].sort((a, b) => (cur.get(a.id)?.position ?? 999) - (cur.get(b.id)?.position ?? 999) || a.phrase.localeCompare(b.phrase));
 
   return (
@@ -115,7 +122,7 @@ export default async function Positions() {
             <KpiCard label={`Absents des ${DEPTH} premiers`} value={`${okNow.length - sum.top50}`} hint="Une page dédiée les aide souvent" tone={okNow.length - sum.top50 > 0 ? "danger" : "muted"} />
           </div>
 
-          {weeks.length < 2 ? (
+          {history.length < 2 ? (
             <Card className="text-sm text-text-muted">Les courbes d'évolution apparaîtront ici dès la deuxième semaine de mesure : il faut au moins deux points pour tracer une courbe.</Card>
           ) : (
             <PositionCharts depth={DEPTH} trend={trend} keywords={sorted.map((k) => ({ id: k.id, phrase: k.phrase, series: series.get(k.id) ?? [], ...seriesSummary(series.get(k.id) ?? []) }))} />
@@ -133,7 +140,7 @@ export default async function Positions() {
                     <th scope="col" className="px-4 py-2 font-semibold">Mot-clé</th>
                     <th scope="col" className="px-3 py-2 text-center font-semibold">Position</th>
                     <th scope="col" className="px-3 py-2 text-center font-semibold">Évolution</th>
-                    {weeks.length >= 2 && <th scope="col" className="px-3 py-2 font-semibold">{weeks.length} semaines</th>}
+                    {history.length >= 2 && <th scope="col" className="px-3 py-2 font-semibold">{history.length} semaines</th>}
                     <th scope="col" className="px-3 py-2 font-semibold">Page trouvée</th>
                     <th scope="col" className="px-3 py-2 font-semibold">Les 3 premiers</th>
                   </tr>
@@ -146,7 +153,7 @@ export default async function Positions() {
                         <th scope="row" className="max-w-[260px] px-4 py-2.5 font-medium">{k.phrase}</th>
                         <td className="px-3 py-2.5 text-center"><Place c={c} /></td>
                         <td className="px-3 py-2.5 text-center"><Move now={c} before={old.get(k.id)} /></td>
-                        {weeks.length >= 2 && <td className="px-3 py-2.5"><Spark points={series.get(k.id) ?? []} /></td>}
+                        {history.length >= 2 && <td className="px-3 py-2.5"><Spark points={series.get(k.id) ?? []} /></td>}
                         <td className="max-w-[200px] truncate px-3 py-2.5 text-text-muted">{c?.url ? <a href={c.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{pathOf(c.url)}</a> : "—"}</td>
                         <td className="max-w-[240px] px-3 py-2.5 text-xs text-text-muted">{c?.top.length ? c.top.map((t) => <span key={t.rank} className="block truncate">{t.rank}. {t.domain === host ? <strong className="text-text">{t.domain}</strong> : t.domain}</span>) : "—"}</td>
                       </tr>

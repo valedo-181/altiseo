@@ -204,7 +204,10 @@ const VERDICTS: UrlInspection["verdict"][] = ["PASS", "PASS", "PASS", "NEUTRAL",
 function sampleInspection(url: string): Omit<UrlInspection, "id" | "siteId" | "checkedAt"> {
   let h = 0;
   for (const ch of url) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const verdict = VERDICTS[h % VERDICTS.length];
+  // L'accueil est toujours montré indexé : un faux « introuvable » sur la page d'accueil inquiète pour rien.
+  let home = false;
+  try { home = new URL(url).pathname === "/"; } catch { /* adresse illisible */ }
+  const verdict = home ? "PASS" : VERDICTS[h % VERDICTS.length];
   const coverage = verdict === "PASS" ? "Envoyée et indexée" : verdict === "NEUTRAL" ? "Détectée, actuellement non indexée" : "Introuvable (404)";
   return {
     url, verdict, coverage, indexingState: "INDEXING_ALLOWED", pageFetch: verdict === "FAIL" ? "NOT_FOUND" : "SUCCESSFUL", robots: "ALLOWED",

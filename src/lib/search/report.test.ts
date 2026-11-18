@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { addDays } from "../domain/dates.ts";
 import { buildReport, findQuery, matchProperty, percentChange, positionGain, sampleRows, CHART_DAYS, type DayRow, type QueryRow } from "./report.ts";
-import { consentUrl, dailyQueries, exchangeCode, GOOGLE_SCOPE, listProperties, refreshAccess } from "./google.ts";
+import { consentUrl, dailyQueries, forbidden, exchangeCode, GOOGLE_SCOPE, listProperties, refreshAccess } from "./google.ts";
 
 const TO = "2026-11-08";
 const day = (n: number) => addDays(TO, -n);
@@ -113,4 +113,13 @@ test("Google : lecture des recherches par jour, lignes mal formées écartées",
   assert.deepEqual(JSON.parse(sent!.body).dimensions, ["date", "query"]);
   const denied = await dailyQueries("a", "sc-domain:exemple.ch", "2026-10-01", "2026-11-08", async () => json(403, {}));
   assert.equal(denied.ok, false);
+});
+
+test("a Google 403 names its cause", async () => {
+  const disabled = JSON.stringify({ error: { code: 403, message: "Google Search Console API has not been used in project 123 before or it is disabled.", status: "PERMISSION_DENIED", details: [{ reason: "SERVICE_DISABLED" }] } });
+  assert.match(forbidden(disabled), /pas activée/);
+  assert.match(forbidden(JSON.stringify({ error: { errors: [{ reason: "insufficientPermissions" }] } })), /cochez/);
+  assert.match(forbidden(""), /n'a pas accès à ce site/);
+  const r = await listProperties("tok", async () => new Response(disabled, { status: 403 }));
+  assert.ok(!r.ok && /pas activée/.test(r.error));
 });

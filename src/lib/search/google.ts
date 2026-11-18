@@ -58,6 +58,20 @@ export async function revokeToken(refreshToken: string, f: Fetcher = fetch): Pro
   await call(f, "https://oauth2.googleapis.com/revoke", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: refreshToken }) }).catch(() => undefined);
 }
 
+/**
+ * Un refus 403 de Google a plusieurs causes très différentes : l'API pas activée dans le projet
+ * Google Cloud d'Altiseo, l'accès Search Console pas coché, ou le site retiré du compte.
+ */
+export function forbidden(body: string): string {
+  if (/SERVICE_DISABLED|accessNotConfigured|has not been used in project|is disabled/i.test(body)) {
+    return "L'API Google Search Console n'est pas activée dans le projet Google Cloud d'Altiseo. Activez-la (Google Cloud, API et services, « Google Search Console API », Activer), attendez quelques minutes, puis reconnectez.";
+  }
+  if (/insufficientPermissions|ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficient authentication scopes/i.test(body)) {
+    return "L'accès à Search Console n'a pas été accordé. Reconnectez et cochez la case Search Console chez Google.";
+  }
+  return "Ce compte Google n'a pas accès à ce site dans Search Console.";
+}
+
 async function api<T>(f: Fetcher, access: string, path: string, body?: unknown): Promise<GoogleResult<T>> {
   let res: Response;
   try {
@@ -66,7 +80,7 @@ async function api<T>(f: Fetcher, access: string, path: string, body?: unknown):
     return { ok: false, error: "Google ne répond pas. Réessayez dans un instant." };
   }
   if (res.status === 401) return { ok: false, revoked: true, error: "L'accès à Google a été retiré ou a expiré. Reconnectez votre compte." };
-  if (res.status === 403) return { ok: false, error: "Ce compte Google n'a plus accès à ce site dans Search Console." };
+  if (res.status === 403) return { ok: false, error: forbidden(await res.text().catch(() => "")) };
   if (res.status === 429) return { ok: false, error: "Google limite les demandes pour le moment. Réessayez dans quelques minutes." };
   if (!res.ok) return { ok: false, error: `Google a renvoyé une erreur (${res.status}).` };
   return { ok: true, value: (await res.json().catch(() => ({}))) as T };

@@ -100,7 +100,7 @@
       `DATAFORSEO_PASSWORD` dans Vercel et redéploiement. Vérifier ensuite une première mesure réelle.
 - [x] **Migration `20261121000000_admin_plus.sql` appliquée en production** le 16.11.2026 (en deux temps :
       tables, puis fonctions). Les nouvelles pages de la console admin sont actives.
-- [ ] **Brancher le vrai Google (Search Console).** En attente. Fait : domevia.ch est dans Search Console (12.11.2026).
+- [ ] **Brancher le vrai Google (Search Console).** Le 18.11 : projet Google Cloud, écran de consentement (mode Test, utilisateur test ajouté), client OAuth Web avec les deux adresses de retour, `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET` dans Vercel. Reste : tester « Connecter Google » puis passer l'application en production (logo : replica/brand/logo-google-120.png). Déjà : domevia.ch est dans Search Console (12.11.2026).
       Reste, côté Google Cloud : projet, activer « Google Search Console API », écran de consentement OAuth (externe,
       adresse du propriétaire en utilisateur test), ID client « Application Web » avec les deux redirections
       `https://altiseo-hazel.vercel.app/app/mots-cles/google/callback` (transition) et

@@ -420,6 +420,7 @@ export const demoDb = {
     await write((d) => {
       siteOf(d, siteId, workspaceId);
       d.search = d.search.filter((x) => x.siteId !== siteId);
+      d.inspections = d.inspections.filter((x) => x.siteId !== siteId);
     });
   },
 

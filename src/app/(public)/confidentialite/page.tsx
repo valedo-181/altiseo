@@ -52,6 +52,17 @@ export default function Privacy() {
       <h2>Intelligence artificielle</h2>
       <p>Pour écrire vos contenus, Altiseo transmet à un service d'intelligence artificielle la description de votre activité, le contenu public de votre site et vos consignes. Évitez d'y inscrire des données personnelles de tiers. Les contenus produits vous sont proposés pour relecture : aucune décision ayant un effet juridique pour vous n'est prise de façon automatique.</p>
 
+      <h2>Données de votre compte Google</h2>
+      <p>Si vous connectez Google Search Console, Altiseo demande à Google un accès en <strong>lecture seule</strong> (autorisation « webmasters.readonly »). Altiseo ne peut rien modifier dans votre compte Google.</p>
+      <ul>
+        <li><strong>Ce que nous lisons</strong> : la liste de vos sites dans Search Console, pour retrouver celui que vous suivez dans Altiseo ; pour ce site seulement, les recherches qui l'ont fait apparaître (clics, affichages, position) et l'état d'indexation de ses pages.</li>
+        <li><strong>À quoi cela sert</strong> : uniquement à vous montrer ces chiffres dans votre espace Altiseo (pages Mots-clés et Indexation) et à suivre leur évolution.</li>
+        <li><strong>Ce que nous gardons</strong> : un jeton d'accès chiffré et les chiffres de votre site. Nous ne gardons ni votre mot de passe Google, ni vos autres sites.</li>
+        <li><strong>Ce que nous ne faisons pas</strong> : ces données ne sont ni vendues, ni utilisées pour de la publicité, ni transmises à des services d'intelligence artificielle, ni utilisées pour entraîner des modèles. Notre équipe ne les consulte que si vous le demandez, pour la sécurité ou si la loi l'exige.</li>
+        <li><strong>Retirer l'accès</strong> : le bouton « Déconnecter Google » de la page Mots-clés retire l'accès chez Google et efface le jeton et les chiffres chez nous. Vous pouvez aussi le retirer depuis votre compte Google (myaccount.google.com/permissions).</li>
+      </ul>
+      <p lang="en">Altiseo's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
       <h2>Cookies</h2>
       <p>Altiseo utilise uniquement les cookies indispensables : celui qui maintient votre connexion et ceux qui protègent les formulaires. Il n'y a ni cookie publicitaire ni outil de suivi tiers sur ce site, donc pas de bandeau de consentement.</p>
 

@@ -407,6 +407,8 @@ export const supabaseDb = {
   async removeSearchConnection(workspaceId: string, siteId: string) {
     await siteOf(workspaceId, siteId);
     check(await adminClient().from("search_connections").delete().eq("site_id", siteId));
+    // Les états d'indexation viennent aussi de Google : ils partent avec la connexion.
+    check(await adminClient().from("url_inspections").delete().eq("site_id", siteId));
   },
 
   // Visibilité IA -------------------------------------------------------------
